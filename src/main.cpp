@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <time.h>
+#include <WiFi.h>
+#include <esp_task_wdt.h>
 
 #include <memory>
 
@@ -158,6 +160,14 @@ void setup() {
   
   Serial.println("==========================");
 
+  // Disable task watchdog to prevent WiFi+PSRAM issues
+  esp_task_wdt_deinit();
+  
+  // Initialize WiFi early to prevent issues
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);
+  delay(100);
+
   initializeDefaultConfig();
 
   pinMode(BATTERY_PIN, INPUT);
@@ -185,6 +195,8 @@ void setup() {
   // }
 
   if (appConfig->currentScreenIndex != CONFIG_SCREEN) {
+    Serial.printf("WiFi credentials loaded: SSID='%s', Password length=%d\n", 
+                  appConfig->wifiSSID, strlen(appConfig->wifiPassword));
     WiFiConnection wifi(appConfig->wifiSSID, appConfig->wifiPassword);
     wifi.connect();
     if (!wifi.isConnected()) {

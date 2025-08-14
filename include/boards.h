@@ -12,8 +12,8 @@
 #define EPD_MISO (-1)  // Not used by e-paper
 #define EPD_SCLK 12    // SPI Clock
 
-// Button configuration
-#define BUTTON_1 39  // Button GPIO pin
+// Button configuration (BOOT button)
+#define BUTTON_1 0   // Boot button on LilyGO T7-S3
 
 // Battery monitoring
 #define BATTERY_PIN 35  // ADC pin for battery monitoring

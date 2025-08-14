@@ -1,6 +1,7 @@
 #include "WiFiConnection.h"
 
 #include <WiFi.h>
+#include <esp_task_wdt.h>
 
 #include "boards.h"
 
@@ -9,12 +10,18 @@ WiFiConnection::WiFiConnection(const char* ssid, const char* password)
 
 void WiFiConnection::connect() {
   Serial.printf("Connecting to WiFi: %s\n", _ssid);
+  
+  // Simple WiFi initialization
+  WiFi.mode(WIFI_STA);
   WiFi.begin(_ssid, _password);
+  
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+  const int maxAttempts = 20;
+  while (WiFi.status() != WL_CONNECTED && attempts < maxAttempts) {
     delay(500);
-    Serial.print(".");
+    Serial.printf("WiFi status: %d, attempt: %d/%d\n", WiFi.status(), attempts + 1, maxAttempts);
     attempts++;
+    yield();  // Keep system responsive
   }
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\nConnected to WiFi");
