@@ -148,6 +148,15 @@ void initializeDefaultConfig() {
 
 void setup() {
   Serial.begin(115200);
+  delay(2000);  // Wait for serial monitor to connect
+  
+  Serial.println("\n=== ESP32-S3 Boot Info ===");
+  
+  // Check PSRAM status
+  Serial.printf("Free PSRAM: %d bytes\n", ESP.getFreePsram());
+  Serial.printf("Total PSRAM: %d bytes\n", ESP.getPsramSize());
+  
+  Serial.println("==========================");
 
   initializeDefaultConfig();
 
