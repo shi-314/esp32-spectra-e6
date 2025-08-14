@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <HTTPClient.h>
 
+#include <memory>
+
 struct DownloadResult {
   uint8_t* data;
   size_t size;
@@ -10,6 +12,12 @@ struct DownloadResult {
   String etag;
 
   DownloadResult() : data(nullptr), size(0), httpCode(0), etag("") {}
+
+  ~DownloadResult() {
+    if (data != nullptr) {
+      free(data);
+    }
+  }
 };
 
 class HttpDownloader {
@@ -17,11 +25,10 @@ class HttpDownloader {
   HttpDownloader();
   ~HttpDownloader();
 
-  DownloadResult download(const String& url, const String& cachedETag = "");
-  void cleanup(DownloadResult& result);
+  std::unique_ptr<DownloadResult> download(const String& url, const String& cachedETag = "");
   String urlEncode(const String& str);
 
  private:
-  DownloadResult downloadChunked(WiFiClient* stream);
-  DownloadResult downloadRegular(WiFiClient* stream);
+  std::unique_ptr<DownloadResult> downloadChunked(WiFiClient* stream);
+  std::unique_ptr<DownloadResult> downloadRegular(WiFiClient* stream);
 };

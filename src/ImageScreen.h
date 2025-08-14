@@ -10,6 +10,35 @@
 
 RTC_DATA_ATTR static char storedImageETag[128] = "";
 
+struct ColorImageBitmaps {
+  uint8_t* blackBitmap;
+  uint8_t* yellowBitmap;
+  uint8_t* redBitmap;
+  uint8_t* blueBitmap;
+  uint8_t* greenBitmap;
+  uint32_t width;
+  uint32_t height;
+  size_t bitmapSize;
+
+  ColorImageBitmaps()
+      : blackBitmap(nullptr),
+        yellowBitmap(nullptr),
+        redBitmap(nullptr),
+        blueBitmap(nullptr),
+        greenBitmap(nullptr),
+        width(0),
+        height(0),
+        bitmapSize(0) {}
+
+  ~ColorImageBitmaps() {
+    if (blackBitmap) free(blackBitmap);
+    if (yellowBitmap) free(yellowBitmap);
+    if (redBitmap) free(redBitmap);
+    if (blueBitmap) free(blueBitmap);
+    if (greenBitmap) free(greenBitmap);
+  }
+};
+
 class ImageScreen : public Screen {
  private:
   DisplayType& display;
@@ -20,8 +49,9 @@ class ImageScreen : public Screen {
   const uint8_t* smallFont;
   String ditheringServiceUrl;
 
-  int downloadAndDisplayImage();
-  int processImageData(uint8_t* data, size_t dataSize);
+  std::unique_ptr<DownloadResult> download();
+  std::unique_ptr<ColorImageBitmaps> processImageData(uint8_t* data, size_t dataSize);
+  void renderBitmaps(const ColorImageBitmaps& bitmaps);
   void displayError(const String& errorMessage);
   void storeImageETag(const String& etag);
   String getStoredImageETag();
