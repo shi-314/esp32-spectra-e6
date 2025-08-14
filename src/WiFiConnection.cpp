@@ -5,12 +5,7 @@
 #include "boards.h"
 
 WiFiConnection::WiFiConnection(const char* ssid, const char* password)
-    : _ssid(ssid), _password(password), connected(false) {
-#ifdef _HAS_LED_
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, !LED_ON);  // Turn LED off initially
-#endif
-}
+    : _ssid(ssid), _password(password), connected(false) {}
 
 void WiFiConnection::connect() {
   Serial.printf("Connecting to WiFi: %s\n", _ssid);
@@ -26,16 +21,9 @@ void WiFiConnection::connect() {
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
     connected = true;
-#ifdef _HAS_LED_
-    digitalWrite(LED_PIN, LED_ON);  // Turn LED on when connected
-    Serial.println("LED turned on (WiFi connected)");
-#endif
   } else {
     Serial.println("\nFailed to connect to WiFi");
     connected = false;
-#ifdef _HAS_LED_
-    digitalWrite(LED_PIN, !LED_ON);  // Turn LED off when not connected
-#endif
   }
 }
 
@@ -54,15 +42,9 @@ void WiFiConnection::checkConnection() {
   if (WiFi.status() != WL_CONNECTED && connected) {
     Serial.println("WiFi connection lost");
     connected = false;
-#ifdef _HAS_LED_
-    digitalWrite(LED_PIN, !LED_ON);  // Turn LED off when connection lost
-#endif
     reconnect();
   } else if (WiFi.status() == WL_CONNECTED && !connected) {
     Serial.println("WiFi reconnected");
     connected = true;
-#ifdef _HAS_LED_
-    digitalWrite(LED_PIN, LED_ON);  // Turn LED on when reconnected
-#endif
   }
 }

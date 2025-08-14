@@ -17,9 +17,7 @@ struct Configuration {
   Configuration() = default;
 
   Configuration(const String &ssid, const String &password, const String &imageUrl)
-      : ssid(ssid),
-        password(password),
-        imageUrl(imageUrl) {}
+      : ssid(ssid), password(password), imageUrl(imageUrl) {}
 };
 
 using OnSaveCallback = std::function<void(const Configuration &config)>;

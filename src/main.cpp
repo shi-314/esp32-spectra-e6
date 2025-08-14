@@ -17,10 +17,8 @@
 std::unique_ptr<ApplicationConfig> appConfig;
 ApplicationConfigStorage configStorage;
 
-
 // Standard constructor for GxEPD2
 DisplayType display(Epd2Type(EPD_CS, EPD_DC, EPD_RSET, EPD_BUSY));
-
 
 void goToSleep(uint64_t sleepTimeInSeconds);
 int displayCurrentScreen();
@@ -28,7 +26,6 @@ void cycleToNextScreen();
 bool isButtonWakeup();
 void updateConfiguration(const Configuration& config);
 void initializeDefaultConfig();
-
 
 bool isButtonWakeup() {
   esp_sleep_wakeup_cause_t wakeupReason = esp_sleep_get_wakeup_cause();
@@ -50,8 +47,7 @@ int displayCurrentScreen() {
       ConfigurationScreen configurationScreen(display);
       configurationScreen.render();
 
-      Configuration currentConfig =
-          Configuration(appConfig->wifiSSID, appConfig->wifiPassword, appConfig->imageUrl);
+      Configuration currentConfig = Configuration(appConfig->wifiSSID, appConfig->wifiPassword, appConfig->imageUrl);
       ConfigurationServer configurationServer(currentConfig);
 
       configurationServer.run(updateConfiguration);
@@ -161,24 +157,10 @@ void setup() {
   // Initialize SPI for display
   SPI.begin(EPD_SCLK, EPD_MISO, EPD_MOSI, EPD_CS);
 
-#ifdef _HAS_LED_
-  // Initialize and test LED
+  // Initialize LED and turn it on
   pinMode(LED_PIN, OUTPUT);
-  Serial.printf("LED pin initialized on GPIO %d\n", LED_PIN);
-  Serial.printf("LED_ON value: %d\n", LED_ON);
-
-  // Test LED - blink it a few times
-  for (int i = 0; i < 3; i++) {
-    digitalWrite(LED_PIN, LED_ON);  // Turn on
-    Serial.println("LED should be ON");
-    delay(200);
-    digitalWrite(LED_PIN, !LED_ON);  // Turn off
-    Serial.println("LED should be OFF");
-    delay(200);
-  }
-#else
-  Serial.println("_HAS_LED_ not defined - LED functionality disabled");
-#endif
+  digitalWrite(LED_PIN, LED_ON);
+  Serial.printf("LED initialized and turned on (GPIO %d)\n", LED_PIN);
 
   // Check button state at startup
   Serial.printf("Button pin state at startup: %d\n", digitalRead(BUTTON_1));

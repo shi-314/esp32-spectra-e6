@@ -1,7 +1,7 @@
 #include "ImageScreen.h"
 
-#include <WiFi.h>
 #include <SPIFFS.h>
+#include <WiFi.h>
 
 #include "battery.h"
 
@@ -25,7 +25,7 @@ int ImageScreen::downloadAndDisplayImage() {
   HTTPClient http;
 
   String requestUrl = ditheringServiceUrl + "/process?url=" + urlEncode(String(config.imageUrl)) +
-                      "&width=" + String(display.width()) + "&height=" + String(display.height()) + 
+                      "&width=" + String(display.width()) + "&height=" + String(display.height()) +
                       "&dither=true&normalize=false&colors=000000,ffffff,e6e600,cc0000,0033cc,00cc00";
 
   Serial.println("Requesting image from: " + requestUrl);
@@ -74,48 +74,48 @@ int ImageScreen::downloadAndDisplayImage() {
   // Check if response is chunked
   String transferEncoding = http.header("Transfer-Encoding");
   bool isChunked = transferEncoding.indexOf("chunked") != -1;
-  
+
   if (isChunked) {
     // For chunked responses, manually decode the chunks
     WiFiClient* stream = http.getStreamPtr();
-    
-    size_t bufferCapacity = 400 * 1024; // 400KB buffer
+
+    size_t bufferCapacity = 400 * 1024;  // 400KB buffer
     uint8_t* data = (uint8_t*)ps_malloc(bufferCapacity);
     if (!data) {
       Serial.println("Failed to allocate PSRAM buffer");
       http.end();
       return -1;
     }
-    
+
     size_t totalDataRead = 0;
-    
+
     while (stream->connected()) {
       // Read chunk size line (hex number followed by \r\n)
       char chunkSizeBuffer[16];
       size_t lineLength = stream->readBytesUntil('\n', (uint8_t*)chunkSizeBuffer, sizeof(chunkSizeBuffer) - 1);
-      chunkSizeBuffer[lineLength] = '\0'; // Null terminate
-      
+      chunkSizeBuffer[lineLength] = '\0';  // Null terminate
+
       // Remove trailing \r if present
       if (lineLength > 0 && chunkSizeBuffer[lineLength - 1] == '\r') {
         chunkSizeBuffer[lineLength - 1] = '\0';
         lineLength--;
       }
-      
+
       if (lineLength == 0) {
-        continue; // Empty line, keep reading
+        continue;  // Empty line, keep reading
       }
-      
+
       // Parse hex chunk size
       long chunkSize = strtol(chunkSizeBuffer, NULL, 16);
-      
+
       if (chunkSize == 0) {
-        break; // End of chunks
+        break;  // End of chunks
       }
-      
+
       // Expand buffer if needed
       if (totalDataRead + chunkSize > bufferCapacity) {
         bufferCapacity = max(bufferCapacity * 2, (size_t)(totalDataRead + chunkSize + 1024));
-        
+
         uint8_t* newData = (uint8_t*)ps_realloc(data, bufferCapacity);
         if (!newData) {
           Serial.println("Failed to expand PSRAM buffer");
@@ -125,34 +125,34 @@ int ImageScreen::downloadAndDisplayImage() {
         }
         data = newData;
       }
-      
+
       // Read the chunk data
       size_t bytesRead = stream->readBytes(data + totalDataRead, chunkSize);
       if (bytesRead != chunkSize) {
         Serial.printf("Warning: Expected %ld bytes, got %d bytes\n", chunkSize, bytesRead);
       }
       totalDataRead += bytesRead;
-      
+
       // Read trailing \r\n after chunk data (2 bytes)
       uint8_t trailer[2];
       stream->readBytes(trailer, 2);
     }
-    
+
     http.end();
-    
+
     if (totalDataRead == 0) {
       Serial.println("No data received from chunked response");
       free(data);
       return -1;
     }
-    
+
     Serial.printf("Downloaded %d bytes from web\n", totalDataRead);
-    
+
     return processImageData(data, totalDataRead);
   } else {
     // For non-chunked responses, use simple stream reading
     WiFiClient* stream = http.getStreamPtr();
-    
+
     size_t bufferCapacity = 400 * 1024;
     uint8_t* data = (uint8_t*)ps_malloc(bufferCapacity);
     if (!data) {
@@ -163,7 +163,7 @@ int ImageScreen::downloadAndDisplayImage() {
 
     size_t totalRead = 0;
     const size_t chunkSize = 1024;
-    
+
     while (stream->available() > 0) {
       if (totalRead + chunkSize > bufferCapacity) {
         bufferCapacity = bufferCapacity * 2;
@@ -175,12 +175,12 @@ int ImageScreen::downloadAndDisplayImage() {
         }
         data = newData;
       }
-      
+
       size_t bytesRead = stream->readBytes(data + totalRead, chunkSize);
       if (bytesRead == 0) break;
       totalRead += bytesRead;
     }
-    
+
     http.end();
     Serial.printf("Downloaded %d bytes from web\n", totalRead);
     return processImageData(data, totalRead);
@@ -211,7 +211,7 @@ int ImageScreen::processImageData(uint8_t* data, size_t dataSize) {
   uint32_t imageHeight = bmpHeader[22] | (bmpHeader[23] << 8) | (bmpHeader[24] << 16) | (bmpHeader[25] << 24);
   uint16_t bitsPerPixel = bmpHeader[28] | (bmpHeader[29] << 8);
   uint32_t compression = bmpHeader[30] | (bmpHeader[31] << 8) | (bmpHeader[32] << 16) | (bmpHeader[33] << 24);
-  
+
   Serial.printf("BMP Header Debug:\n");
   Serial.printf("  Data offset: %d\n", dataOffset);
   Serial.printf("  Image size: %dx%d\n", imageWidth, imageHeight);
@@ -254,7 +254,7 @@ int ImageScreen::processImageData(uint8_t* data, size_t dataSize) {
     Serial.printf("Skipping %d bytes to reach data offset %d\n", skipBytes, dataOffset);
     dataIndex += skipBytes;
   }
-  
+
   Serial.printf("Starting pixel data read at index %d\n", dataIndex);
 
   display.init(115200);
@@ -286,14 +286,13 @@ int ImageScreen::processImageData(uint8_t* data, size_t dataSize) {
 
   for (int y = imageHeight - 1; y >= 0; y--) {
     if (dataIndex + rowSize > dataSize) {
-      Serial.printf("Not enough data for row %d: need %d bytes, have %d remaining (dataIndex=%d)\n", 
-                    y, rowSize, dataSize - dataIndex, dataIndex);
+      Serial.printf("Not enough data for row %d: need %d bytes, have %d remaining (dataIndex=%d)\n", y, rowSize,
+                    dataSize - dataIndex, dataIndex);
       delete[] rowBuffer;
       free(pixelBuffer);
       free(data);
       return -1;
     }
-    
 
     // Ensure we don't read beyond data bounds
     if (dataIndex + rowSize <= dataSize) {
@@ -304,24 +303,24 @@ int ImageScreen::processImageData(uint8_t* data, size_t dataSize) {
       memset(rowBuffer, 0, rowSize);
     }
     dataIndex += rowSize;
-    
+
     // Debug: Print first few rows and check for unexpected data
     if (y >= imageHeight - 3 || y <= 2) {
-      Serial.printf("Row %d (BMP line %d): first 10 pixels: ", y, (imageHeight-1)-y);
+      Serial.printf("Row %d (BMP line %d): first 10 pixels: ", y, (imageHeight - 1) - y);
       for (int i = 0; i < 10 && i < imageWidth; i++) {
         Serial.printf("%d ", rowBuffer[i]);
       }
       Serial.println();
     }
-    
+
     // Check if we're getting unexpected zeros
     int zeroCount = 0;
     for (int i = 0; i < imageWidth; i++) {
       if (rowBuffer[i] == 0) zeroCount++;
     }
-    if (zeroCount > imageWidth * 0.9) { // More than 90% zeros
-      Serial.printf("WARNING: Row %d has %d zeros out of %d pixels (%.1f%%)\n", 
-                    y, zeroCount, imageWidth, (float)zeroCount/imageWidth*100);
+    if (zeroCount > imageWidth * 0.9) {  // More than 90% zeros
+      Serial.printf("WARNING: Row %d has %d zeros out of %d pixels (%.1f%%)\n", y, zeroCount, imageWidth,
+                    (float)zeroCount / imageWidth * 100);
     }
 
     for (int x = 0; x < imageWidth; x++) {
@@ -349,15 +348,10 @@ int ImageScreen::processImageData(uint8_t* data, size_t dataSize) {
 
   // Debug: Print pixel statistics for 4 colors
   Serial.printf("Processed %d pixels:\n", totalPixelCount);
-  Serial.printf("  Index 0: %d pixels (%.1f%%)\n", pixelCount[0],
-                (float)pixelCount[0] / totalPixelCount * 100.0f);
-  Serial.printf("  Index 1: %d pixels (%.1f%%)\n", pixelCount[1],
-                (float)pixelCount[1] / totalPixelCount * 100.0f);
-  Serial.printf("  Index 2: %d pixels (%.1f%%)\n", pixelCount[2],
-                (float)pixelCount[2] / totalPixelCount * 100.0f);
-  Serial.printf("  Index 3: %d pixels (%.1f%%)\n", pixelCount[3],
-                (float)pixelCount[3] / totalPixelCount * 100.0f);
-
+  Serial.printf("  Index 0: %d pixels (%.1f%%)\n", pixelCount[0], (float)pixelCount[0] / totalPixelCount * 100.0f);
+  Serial.printf("  Index 1: %d pixels (%.1f%%)\n", pixelCount[1], (float)pixelCount[1] / totalPixelCount * 100.0f);
+  Serial.printf("  Index 2: %d pixels (%.1f%%)\n", pixelCount[2], (float)pixelCount[2] / totalPixelCount * 100.0f);
+  Serial.printf("  Index 3: %d pixels (%.1f%%)\n", pixelCount[3], (float)pixelCount[3] / totalPixelCount * 100.0f);
 
   // Calculate position to center the image on display
   int displayWidth = display.width();
@@ -393,15 +387,15 @@ int ImageScreen::processImageData(uint8_t* data, size_t dataSize) {
   // Calculate bitmap size in bytes (1 bit per pixel, padded to byte boundary)
   int bitmapWidthBytes = (imageWidth + 7) / 8;  // Round up to nearest byte
   size_t bitmapSize = bitmapWidthBytes * imageHeight;
-  
+
   // Allocate bitmap planes for 7-color display
   // Palette: 000000,ffffff,e6e600,cc0000,0033cc,00cc00 (Black,White,Yellow,Red,Blue,Green)
   uint8_t* blackBitmap = (uint8_t*)ps_malloc(bitmapSize);   // Index 0: 000000 (Black)
-  uint8_t* yellowBitmap = (uint8_t*)ps_malloc(bitmapSize);  // Index 2: e6e600 (Yellow)  
+  uint8_t* yellowBitmap = (uint8_t*)ps_malloc(bitmapSize);  // Index 2: e6e600 (Yellow)
   uint8_t* redBitmap = (uint8_t*)ps_malloc(bitmapSize);     // Index 3: cc0000 (Red)
   uint8_t* blueBitmap = (uint8_t*)ps_malloc(bitmapSize);    // Index 4: 0033cc (Blue)
   uint8_t* greenBitmap = (uint8_t*)ps_malloc(bitmapSize);   // Index 5: 00cc00 (Green, native support!)
-  
+
   if (!blackBitmap || !yellowBitmap || !redBitmap || !blueBitmap || !greenBitmap) {
     Serial.println("Failed to allocate PSRAM for bitmap planes");
     if (blackBitmap) free(blackBitmap);
@@ -414,31 +408,30 @@ int ImageScreen::processImageData(uint8_t* data, size_t dataSize) {
     return -1;
   }
   Serial.printf("Allocated 5x %d bytes in PSRAM for bitmap planes\n", bitmapSize);
-  
+
   // Initialize bitmaps to 0 (all pixels off)
   memset(blackBitmap, 0, bitmapSize);
   memset(yellowBitmap, 0, bitmapSize);
   memset(redBitmap, 0, bitmapSize);
   memset(blueBitmap, 0, bitmapSize);
   memset(greenBitmap, 0, bitmapSize);
-  
-  Serial.printf("Creating bitmap planes: %dx%d, %d bytes per bitmap\n", 
-                imageWidth, imageHeight, bitmapSize);
-  
+
+  Serial.printf("Creating bitmap planes: %dx%d, %d bytes per bitmap\n", imageWidth, imageHeight, bitmapSize);
+
   // Convert indexed color buffer to bitmap planes
-  int bitmapPixelCounts[6] = {0, 0, 0, 0, 0, 0}; // Count pixels in each bitmap
-  
+  int bitmapPixelCounts[6] = {0, 0, 0, 0, 0, 0};  // Count pixels in each bitmap
+
   for (int y = 0; y < imageHeight; y++) {
     for (int x = 0; x < imageWidth; x++) {
       int bufferIndex = y * imageWidth + x;
       uint8_t colorIndex = pixelBuffer[bufferIndex];
-      
+
       // Calculate bit position in bitmap - flip X coordinate to fix horizontal mirroring
       int flippedX = (imageWidth - 1) - x;  // Reverse X coordinate
       int byteIndex = y * bitmapWidthBytes + flippedX / 8;
       int bitIndex = 7 - (flippedX % 8);  // MSB first
       uint8_t bitMask = 1 << bitIndex;
-      
+
       // Set appropriate bit in the corresponding color plane
       // Spectra 6 color mapping: 000000,ffffff,e6e600,cc0000,0033cc,00cc00
       switch (colorIndex) {
@@ -469,19 +462,19 @@ int ImageScreen::processImageData(uint8_t* data, size_t dataSize) {
       }
     }
   }
-  
-  Serial.printf("Bitmap plane pixel counts: Black=%d, Yellow=%d, Red=%d, Blue=%d, Orange=%d\n", 
-                bitmapPixelCounts[0], bitmapPixelCounts[2], bitmapPixelCounts[3], bitmapPixelCounts[4], bitmapPixelCounts[5]);
-  
+
+  Serial.printf("Bitmap plane pixel counts: Black=%d, Yellow=%d, Red=%d, Blue=%d, Orange=%d\n", bitmapPixelCounts[0],
+                bitmapPixelCounts[2], bitmapPixelCounts[3], bitmapPixelCounts[4], bitmapPixelCounts[5]);
+
   // Display the image using chunked rendering due to buffer limitations
   // DisplayType uses HEIGHT/4 buffer, so we need to render in 4 chunks
   const int chunkHeight = imageHeight / 4;  // 480/4 = 120 pixels per chunk
-  
+
   display.setFullWindow();
   display.fillScreen(GxEPD_WHITE);
-  
+
   Serial.printf("Rendering in 4 chunks of %d pixels height each\n", chunkHeight);
-  
+
   // Render all chunks to buffer without individual display updates
   display.firstPage();
   do {
@@ -489,31 +482,26 @@ int ImageScreen::processImageData(uint8_t* data, size_t dataSize) {
       int startY = chunk * chunkHeight;
       int endY = min(startY + chunkHeight, (int)imageHeight);
       int actualChunkHeight = endY - startY;
-      
-      Serial.printf("Drawing chunk %d: Y=%d to %d (height=%d)\n", chunk, startY, endY-1, actualChunkHeight);
-      
+
+      Serial.printf("Drawing chunk %d: Y=%d to %d (height=%d)\n", chunk, startY, endY - 1, actualChunkHeight);
+
       // Calculate bitmap offsets for this chunk
       int bitmapChunkOffset = startY * bitmapWidthBytes;
-      
+
       // Draw chunk portion of each bitmap to the buffer
-      display.drawBitmap(imageX, imageY + startY, 
-                        blackBitmap + bitmapChunkOffset, 
-                        imageWidth, actualChunkHeight, GxEPD_BLACK);
-      display.drawBitmap(imageX, imageY + startY, 
-                        yellowBitmap + bitmapChunkOffset, 
-                        imageWidth, actualChunkHeight, GxEPD_YELLOW);
-      display.drawBitmap(imageX, imageY + startY, 
-                        redBitmap + bitmapChunkOffset, 
-                        imageWidth, actualChunkHeight, GxEPD_RED);
-      display.drawBitmap(imageX, imageY + startY, 
-                        blueBitmap + bitmapChunkOffset, 
-                        imageWidth, actualChunkHeight, GxEPD_BLUE);
-      display.drawBitmap(imageX, imageY + startY, 
-                        greenBitmap + bitmapChunkOffset, 
-                        imageWidth, actualChunkHeight, GxEPD_GREEN);
+      display.drawBitmap(imageX, imageY + startY, blackBitmap + bitmapChunkOffset, imageWidth, actualChunkHeight,
+                         GxEPD_BLACK);
+      display.drawBitmap(imageX, imageY + startY, yellowBitmap + bitmapChunkOffset, imageWidth, actualChunkHeight,
+                         GxEPD_YELLOW);
+      display.drawBitmap(imageX, imageY + startY, redBitmap + bitmapChunkOffset, imageWidth, actualChunkHeight,
+                         GxEPD_RED);
+      display.drawBitmap(imageX, imageY + startY, blueBitmap + bitmapChunkOffset, imageWidth, actualChunkHeight,
+                         GxEPD_BLUE);
+      display.drawBitmap(imageX, imageY + startY, greenBitmap + bitmapChunkOffset, imageWidth, actualChunkHeight,
+                         GxEPD_GREEN);
     }
   } while (display.nextPage());
-  
+
   // Clean up bitmap planes
   free(blackBitmap);
   free(yellowBitmap);

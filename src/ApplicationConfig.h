@@ -8,11 +8,7 @@
 #include "config_default.h"
 #endif
 
-enum ScreenType {
-  CONFIG_SCREEN = 0,
-  IMAGE_SCREEN = 1,
-  SCREEN_COUNT = 2
-};
+enum ScreenType { CONFIG_SCREEN = 0, IMAGE_SCREEN = 1, SCREEN_COUNT = 2 };
 
 struct ApplicationConfig {
   char wifiSSID[64];
