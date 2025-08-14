@@ -59,13 +59,6 @@ std::unique_ptr<ColorImageBitmaps> ImageScreen::processImageData(uint8_t* data, 
   uint16_t bitsPerPixel = bmpHeader[28] | (bmpHeader[29] << 8);
   uint32_t compression = bmpHeader[30] | (bmpHeader[31] << 8) | (bmpHeader[32] << 16) | (bmpHeader[33] << 24);
 
-  Serial.printf("BMP Header Debug:\n");
-  Serial.printf("  Data offset: %d\n", dataOffset);
-  Serial.printf("  Image size: %dx%d\n", imageWidth, imageHeight);
-  Serial.printf("  Bits per pixel: %d\n", bitsPerPixel);
-  Serial.printf("  Compression: %d\n", compression);
-  Serial.printf("  Payload size: %d\n", dataSize);
-
   if (bitsPerPixel != 8) {
     Serial.printf("Unsupported bits per pixel: %d (expected 8 for indexed color)\n", bitsPerPixel);
     return nullptr;
@@ -86,26 +79,18 @@ std::unique_ptr<ColorImageBitmaps> ImageScreen::processImageData(uint8_t* data, 
   // Skip the full palette since we'll map pixel indices directly to grayscale
   dataIndex += paletteSize;
 
-  Serial.printf("Skipped %d byte color palette\n", paletteSize);
-
   if (dataOffset > dataIndex) {
     uint32_t skipBytes = dataOffset - dataIndex;
     if (dataIndex + skipBytes > dataSize) {
       Serial.printf("Data offset beyond payload size: offset %d, payload size %d\n", dataOffset, dataSize);
       return nullptr;
     }
-    Serial.printf("Skipping %d bytes to reach data offset %d\n", skipBytes, dataOffset);
     dataIndex += skipBytes;
   }
-
-  Serial.printf("Starting pixel data read at index %d\n", dataIndex);
 
   // Row size padded to 4-byte boundary
   uint32_t rowSize = ((imageWidth * bitsPerPixel + 31) / 32) * 4;
   uint8_t* rowBuffer = new uint8_t[rowSize];
-
-  Serial.printf("BMP processing: width=%d, height=%d, bitsPerPixel=%d, rowSize=%d\n", imageWidth, imageHeight,
-                bitsPerPixel, rowSize);
 
   // Create buffer for color pixel data (1 byte per pixel) using PSRAM
   size_t pixelBufferSize = imageWidth * imageHeight;
@@ -115,10 +100,6 @@ std::unique_ptr<ColorImageBitmaps> ImageScreen::processImageData(uint8_t* data, 
     delete[] rowBuffer;
     return nullptr;
   }
-  Serial.printf("Allocated %d bytes in PSRAM for pixel buffer\n", pixelBufferSize);
-
-  int pixelCount[4] = {0};  // Count pixels for each color level
-  int totalPixelCount = 0;
 
   for (int y = imageHeight - 1; y >= 0; y--) {
     if (dataIndex + rowSize > dataSize) {
@@ -139,31 +120,9 @@ std::unique_ptr<ColorImageBitmaps> ImageScreen::processImageData(uint8_t* data, 
     }
     dataIndex += rowSize;
 
-    // Debug: Print first few rows and check for unexpected data
-    if (y >= imageHeight - 3 || y <= 2) {
-      Serial.printf("Row %d (BMP line %d): first 10 pixels: ", y, (imageHeight - 1) - y);
-      for (int i = 0; i < 10 && i < imageWidth; i++) {
-        Serial.printf("%d ", rowBuffer[i]);
-      }
-      Serial.println();
-    }
-
-    // Check if we're getting unexpected zeros
-    int zeroCount = 0;
-    for (int i = 0; i < imageWidth; i++) {
-      if (rowBuffer[i] == 0) zeroCount++;
-    }
-    if (zeroCount > imageWidth * 0.9) {  // More than 90% zeros
-      Serial.printf("WARNING: Row %d has %d zeros out of %d pixels (%.1f%%)\n", y, zeroCount, imageWidth,
-                    (float)zeroCount / imageWidth * 100);
-    }
-
     for (int x = 0; x < imageWidth; x++) {
       uint8_t pixelIndex = rowBuffer[x];
-      totalPixelCount++;
-
-      // Map 4-color palette indices directly to display colors
-      // Test: Let's see if the mapping is correct by checking actual distribution
+      // Map palette indices directly to display colors
       uint8_t colorIndex = pixelIndex;  // Direct mapping first
 
       // We're reading BMP rows from bottom (y=imageHeight-1) to top (y=0)
@@ -171,22 +130,10 @@ std::unique_ptr<ColorImageBitmaps> ImageScreen::processImageData(uint8_t* data, 
       int displayY = (imageHeight - 1) - y;
       int bufferIndex = displayY * imageWidth + x;
       pixelBuffer[bufferIndex] = colorIndex;
-
-      // Count pixels for debugging
-      if (colorIndex < 4) {
-        pixelCount[colorIndex]++;
-      }
     }
   }
 
   delete[] rowBuffer;
-
-  // Debug: Print pixel statistics for 4 colors
-  Serial.printf("Processed %d pixels:\n", totalPixelCount);
-  Serial.printf("  Index 0: %d pixels (%.1f%%)\n", pixelCount[0], (float)pixelCount[0] / totalPixelCount * 100.0f);
-  Serial.printf("  Index 1: %d pixels (%.1f%%)\n", pixelCount[1], (float)pixelCount[1] / totalPixelCount * 100.0f);
-  Serial.printf("  Index 2: %d pixels (%.1f%%)\n", pixelCount[2], (float)pixelCount[2] / totalPixelCount * 100.0f);
-  Serial.printf("  Index 3: %d pixels (%.1f%%)\n", pixelCount[3], (float)pixelCount[3] / totalPixelCount * 100.0f);
 
   // Create bitmap planes for color data
   // Calculate bitmap size in bytes (1 bit per pixel, padded to byte boundary)
@@ -213,7 +160,6 @@ std::unique_ptr<ColorImageBitmaps> ImageScreen::processImageData(uint8_t* data, 
     free(pixelBuffer);
     return nullptr;
   }
-  Serial.printf("Allocated 5x %d bytes in PSRAM for bitmap planes\n", bitmapSize);
 
   // Initialize bitmaps to 0 (all pixels off)
   memset(bitmaps->blackBitmap, 0, bitmapSize);
@@ -222,10 +168,7 @@ std::unique_ptr<ColorImageBitmaps> ImageScreen::processImageData(uint8_t* data, 
   memset(bitmaps->blueBitmap, 0, bitmapSize);
   memset(bitmaps->greenBitmap, 0, bitmapSize);
 
-  Serial.printf("Creating bitmap planes: %dx%d, %d bytes per bitmap\n", imageWidth, imageHeight, bitmapSize);
-
   // Convert indexed color buffer to bitmap planes
-  int bitmapPixelCounts[6] = {0, 0, 0, 0, 0, 0};  // Count pixels in each bitmap
 
   for (int y = 0; y < imageHeight; y++) {
     for (int x = 0; x < imageWidth; x++) {
@@ -243,34 +186,26 @@ std::unique_ptr<ColorImageBitmaps> ImageScreen::processImageData(uint8_t* data, 
       switch (colorIndex) {
         case 0:  // 000000 - Black
           bitmaps->blackBitmap[byteIndex] |= bitMask;
-          bitmapPixelCounts[0]++;
           break;
         case 1:  // ffffff - White (background - no bits set)
           break;
         case 2:  // e6e600 - Yellow
           bitmaps->yellowBitmap[byteIndex] |= bitMask;
-          bitmapPixelCounts[2]++;
           break;
         case 3:  // cc0000 - Red
           bitmaps->redBitmap[byteIndex] |= bitMask;
-          bitmapPixelCounts[3]++;
           break;
         case 4:  // 0033cc - Blue
           bitmaps->blueBitmap[byteIndex] |= bitMask;
-          bitmapPixelCounts[4]++;
           break;
         case 5:  // 00cc00 - Green (native green support)
           bitmaps->greenBitmap[byteIndex] |= bitMask;
-          bitmapPixelCounts[5]++;
           break;
         default:
           break;
       }
     }
   }
-
-  Serial.printf("Bitmap plane pixel counts: Black=%d, Yellow=%d, Red=%d, Blue=%d, Green=%d\n", bitmapPixelCounts[0],
-                bitmapPixelCounts[2], bitmapPixelCounts[3], bitmapPixelCounts[4], bitmapPixelCounts[5]);
 
   free(pixelBuffer);
 
@@ -283,9 +218,6 @@ void ImageScreen::renderBitmaps(const ColorImageBitmaps& bitmaps) {
   // Calculate position to center the image on display
   int displayWidth = display.width();
   int displayHeight = display.height();
-
-  Serial.printf("Display dimensions: %dx%d, Image dimensions: %dx%d\n", displayWidth, displayHeight, bitmaps.width,
-                bitmaps.height);
 
   // For same-size image, just position at origin
   int imageX = 0;
@@ -303,8 +235,6 @@ void ImageScreen::renderBitmaps(const ColorImageBitmaps& bitmaps) {
   imageX = max(0, imageX);
   imageY = max(0, imageY);
 
-  Serial.printf("Rendering image: %dx%d at position (%d,%d)\n", bitmaps.width, bitmaps.height, imageX, imageY);
-
   // Display the image using chunked rendering due to buffer limitations
   // DisplayType uses HEIGHT/4 buffer, so we need to render in 4 chunks
   const int chunkHeight = bitmaps.height / 4;      // 480/4 = 120 pixels per chunk
@@ -313,8 +243,6 @@ void ImageScreen::renderBitmaps(const ColorImageBitmaps& bitmaps) {
   display.setFullWindow();
   display.fillScreen(GxEPD_WHITE);
 
-  Serial.printf("Rendering in 4 chunks of %d pixels height each\n", chunkHeight);
-
   // Render all chunks to buffer without individual display updates
   display.firstPage();
   do {
@@ -322,8 +250,6 @@ void ImageScreen::renderBitmaps(const ColorImageBitmaps& bitmaps) {
       int startY = chunk * chunkHeight;
       int endY = min(startY + chunkHeight, (int)bitmaps.height);
       int actualChunkHeight = endY - startY;
-
-      Serial.printf("Drawing chunk %d: Y=%d to %d (height=%d)\n", chunk, startY, endY - 1, actualChunkHeight);
 
       // Calculate bitmap offsets for this chunk
       int bitmapChunkOffset = startY * bitmapWidthBytes;
