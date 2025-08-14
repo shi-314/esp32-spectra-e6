@@ -41,7 +41,7 @@ void cycleToNextScreen() {
 
   Serial.println("Cycled to screen: " + String(appConfig->currentScreenIndex));
 
-  // NVS disabled - configuration not saved
+  configStorage.save(*appConfig);
 }
 
 int displayCurrentScreen() {
@@ -113,8 +113,13 @@ void updateConfiguration(const Configuration& config) {
   strncpy(appConfig->wifiPassword, config.password.c_str(), sizeof(appConfig->wifiPassword) - 1);
   strncpy(appConfig->imageUrl, config.imageUrl.c_str(), sizeof(appConfig->imageUrl) - 1);
 
-  // NVS disabled - configuration not saved
-  Serial.println("Configuration updated (not saved - NVS disabled)");
+  // Save configuration to persistent storage
+  bool saved = configStorage.save(*appConfig);
+  if (saved) {
+    Serial.println("Configuration saved to persistent storage");
+  } else {
+    Serial.println("Failed to save configuration to persistent storage");
+  }
 
   Serial.println("Configuration updated");
   Serial.println("WiFi SSID: " + String(appConfig->wifiSSID));
@@ -133,9 +138,16 @@ void goToSleep(uint64_t sleepTimeInSeconds) {
 }
 
 void initializeDefaultConfig() {
-  // NVS disabled - always use default configuration
-  appConfig.reset(new ApplicationConfig());
-  Serial.println("Using default configuration (NVS disabled)");
+  std::unique_ptr<ApplicationConfig> storedConfig = configStorage.load();
+  if (storedConfig) {
+    appConfig = std::move(storedConfig);
+    Serial.println("Configuration loaded from persistent storage: ");
+    Serial.printf("  - WiFi SSID: %s\n", appConfig->wifiSSID);
+    Serial.printf("  - Image URL: %s\n", strlen(appConfig->imageUrl) > 0 ? appConfig->imageUrl : "[NOT SET]");
+  } else {
+    appConfig.reset(new ApplicationConfig());
+    Serial.println("Using default configuration (no stored config found)");
+  }
 }
 
 void setup() {
