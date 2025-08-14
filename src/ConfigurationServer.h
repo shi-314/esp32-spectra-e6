@@ -12,22 +12,13 @@
 struct Configuration {
   String ssid;
   String password;
-  String openaiApiKey;
-  String aiPromptStyle;
-  String city;
-  String countryCode;
   String imageUrl;
 
   Configuration() = default;
 
-  Configuration(const String &ssid, const String &password, const String &openaiApiKey, const String &aiPromptStyle,
-                const String &city, const String &countryCode, const String &imageUrl)
+  Configuration(const String &ssid, const String &password, const String &imageUrl)
       : ssid(ssid),
         password(password),
-        openaiApiKey(openaiApiKey),
-        aiPromptStyle(aiPromptStyle),
-        city(city),
-        countryCode(countryCode),
         imageUrl(imageUrl) {}
 };
 

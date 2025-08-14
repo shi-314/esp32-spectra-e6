@@ -124,22 +124,6 @@ void ConfigurationServer::handleSave(AsyncWebServerRequest *request) {
     config.ssid = request->getParam("ssid", true)->value();
     config.password = request->getParam("password", true)->value();
 
-    if (request->hasParam("openaiApiKey", true)) {
-      config.openaiApiKey = request->getParam("openaiApiKey", true)->value();
-    }
-
-    if (request->hasParam("aiPromptStyle", true)) {
-      config.aiPromptStyle = request->getParam("aiPromptStyle", true)->value();
-    }
-
-    if (request->hasParam("city", true)) {
-      config.city = request->getParam("city", true)->value();
-    }
-
-    if (request->hasParam("countryCode", true)) {
-      config.countryCode = request->getParam("countryCode", true)->value();
-    }
-
     if (request->hasParam("imageUrl", true)) {
       config.imageUrl = request->getParam("imageUrl", true)->value();
     }
@@ -179,10 +163,6 @@ String ConfigurationServer::getConfigurationPage() {
   String html = htmlTemplate;
   html.replace("{{CURRENT_SSID}}", currentConfiguration.ssid);
   html.replace("{{CURRENT_PASSWORD}}", currentConfiguration.password);
-  html.replace("{{CURRENT_OPENAI_KEY}}", currentConfiguration.openaiApiKey);
-  html.replace("{{CURRENT_AI_PROMPT_STYLE}}", currentConfiguration.aiPromptStyle);
-  html.replace("{{CURRENT_CITY}}", currentConfiguration.city);
-  html.replace("{{CURRENT_COUNTRY_CODE}}", currentConfiguration.countryCode);
   html.replace("{{CURRENT_IMAGE_URL}}", currentConfiguration.imageUrl);
   return html;
 }

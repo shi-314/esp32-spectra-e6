@@ -51,8 +51,7 @@ int displayCurrentScreen() {
       configurationScreen.render();
 
       Configuration currentConfig =
-          Configuration(appConfig->wifiSSID, appConfig->wifiPassword, appConfig->openaiApiKey, appConfig->aiPromptStyle,
-                        appConfig->city, appConfig->countryCode, appConfig->imageUrl);
+          Configuration(appConfig->wifiSSID, appConfig->wifiPassword, appConfig->imageUrl);
       ConfigurationServer configurationServer(currentConfig);
 
       configurationServer.run(updateConfiguration);
@@ -101,67 +100,24 @@ void updateConfiguration(const Configuration& config) {
     return;
   }
 
-  if (config.openaiApiKey.length() >= sizeof(appConfig->openaiApiKey)) {
-    Serial.println("Error: OpenAI API key too long, maximum length is " + String(sizeof(appConfig->openaiApiKey) - 1));
-    return;
-  }
-
-  if (config.aiPromptStyle.length() >= sizeof(appConfig->aiPromptStyle)) {
-    Serial.println("Error: AI Prompt Style too long, maximum length is " +
-                   String(sizeof(appConfig->aiPromptStyle) - 1));
-    return;
-  }
-
-  if (config.city.length() >= sizeof(appConfig->city)) {
-    Serial.println("Error: City too long, maximum length is " + String(sizeof(appConfig->city) - 1));
-    return;
-  }
-
-  if (config.countryCode.length() >= sizeof(appConfig->countryCode)) {
-    Serial.println("Error: Country code too long, maximum length is " + String(sizeof(appConfig->countryCode) - 1));
-    return;
-  }
-
   if (config.imageUrl.length() >= sizeof(appConfig->imageUrl)) {
     Serial.println("Error: Image URL too long, maximum length is " + String(sizeof(appConfig->imageUrl) - 1));
     return;
   }
 
-  bool locationChanged =
-      (config.city != String(appConfig->city)) || (config.countryCode != String(appConfig->countryCode));
-
   memset(appConfig->wifiSSID, 0, sizeof(appConfig->wifiSSID));
   memset(appConfig->wifiPassword, 0, sizeof(appConfig->wifiPassword));
-  memset(appConfig->openaiApiKey, 0, sizeof(appConfig->openaiApiKey));
-  memset(appConfig->aiPromptStyle, 0, sizeof(appConfig->aiPromptStyle));
-  memset(appConfig->city, 0, sizeof(appConfig->city));
-  memset(appConfig->countryCode, 0, sizeof(appConfig->countryCode));
   memset(appConfig->imageUrl, 0, sizeof(appConfig->imageUrl));
 
   strncpy(appConfig->wifiSSID, config.ssid.c_str(), sizeof(appConfig->wifiSSID) - 1);
   strncpy(appConfig->wifiPassword, config.password.c_str(), sizeof(appConfig->wifiPassword) - 1);
-  strncpy(appConfig->openaiApiKey, config.openaiApiKey.c_str(), sizeof(appConfig->openaiApiKey) - 1);
-  strncpy(appConfig->aiPromptStyle, config.aiPromptStyle.c_str(), sizeof(appConfig->aiPromptStyle) - 1);
-  strncpy(appConfig->city, config.city.c_str(), sizeof(appConfig->city) - 1);
-  strncpy(appConfig->countryCode, config.countryCode.c_str(), sizeof(appConfig->countryCode) - 1);
   strncpy(appConfig->imageUrl, config.imageUrl.c_str(), sizeof(appConfig->imageUrl) - 1);
-
-  if (locationChanged) {
-    appConfig->latitude = NAN;
-    appConfig->longitude = NAN;
-    Serial.println("Location changed - coordinates will be re-geocoded on next startup");
-  }
 
   // NVS disabled - configuration not saved
   Serial.println("Configuration updated (not saved - NVS disabled)");
 
   Serial.println("Configuration updated");
   Serial.println("WiFi SSID: " + String(appConfig->wifiSSID));
-  Serial.println("OpenAI API Key: " + String(appConfig->hasValidOpenaiApiKey() ? "[CONFIGURED]" : "[NOT SET]"));
-  Serial.println("AI Prompt Style: " +
-                 String(strlen(appConfig->aiPromptStyle) > 0 ? appConfig->aiPromptStyle : "[NOT SET]"));
-  Serial.println("City: " + String(strlen(appConfig->city) > 0 ? appConfig->city : "[NOT SET]"));
-  Serial.println("Country Code: " + String(strlen(appConfig->countryCode) > 0 ? appConfig->countryCode : "[NOT SET]"));
   Serial.println("Image URL: " + String(strlen(appConfig->imageUrl) > 0 ? appConfig->imageUrl : "[NOT SET]"));
 }
 
