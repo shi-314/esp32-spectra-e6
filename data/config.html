@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Weather Station Configuration</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            max-width: 100%;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: #2c3e50;
+            line-height: 1.5;
+            font-size: 16px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 16px;
+            margin: 0;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin: 0 0 20px 0;
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.025em;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #374151;
+            font-size: 14px;
+            letter-spacing: 0.025em;
+        }
+
+        .optional-label {
+            color: #6b7280;
+            font-size: 12px;
+            font-weight: 400;
+            margin-left: 4px;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: inherit;
+            background-color: #ffffff;
+            color: #1f2937;
+            min-height: 52px;
+            -webkit-appearance: none;
+            appearance: none;
+            transition: all 0.2s ease;
+        }
+
+        select {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: inherit;
+            background-color: #ffffff;
+            color: #1f2937;
+            min-height: 52px;
+            -webkit-appearance: none;
+            appearance: none;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 12px center;
+            background-repeat: no-repeat;
+            background-size: 16px;
+            padding-right: 48px;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus,
+        select:focus {
+            border-color: #3b82f6;
+            outline: none;
+            background-color: #ffffff;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        input[type="text"]::placeholder,
+        input[type="password"]::placeholder {
+            color: #9ca3af;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            padding: 16px 24px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 16px;
+            font-family: inherit;
+            font-weight: 600;
+            width: 100%;
+            margin-top: 20px;
+            min-height: 52px;
+            transition: all 0.2s ease;
+            letter-spacing: 0.025em;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status {
+            padding: 16px;
+            margin: 0 0 20px 0;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+            border-radius: 12px;
+            font-weight: 500;
+            min-height: 52px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .status.success {
+            background: rgba(34, 197, 94, 0.1);
+            color: #166534;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .status.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .status.loading {
+            background: rgba(245, 158, 11, 0.1);
+            color: #d97706;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .ai-toggle-section {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .ai-toggle-btn {
+            background: transparent;
+            border: 2px solid #e5e7eb;
+            color: #6b7280;
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-family: inherit;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            letter-spacing: 0.025em;
+            -webkit-tap-highlight-color: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 0 auto;
+        }
+
+        .ai-toggle-btn:hover {
+            border-color: #d1d5db;
+            color: #374151;
+        }
+
+        .ai-toggle-btn:active {
+            transform: translateY(1px);
+        }
+
+        .ai-config-section {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .ai-config-section.show {
+            display: block;
+            opacity: 1;
+        }
+
+        #aiToggleIcon {
+            transition: transform 0.2s ease;
+            font-size: 12px;
+        }
+
+        #aiToggleIcon.rotated {
+            transform: rotate(90deg);
+        }
+
+        /* Mobile-specific improvements */
+        @media (max-width: 480px) {
+            body {
+                padding: 15px;
+            }
+
+            .container {
+                padding: 25px;
+            }
+
+            h1 {
+                font-size: 20px;
+                margin-bottom: 15px;
+            }
+
+            .form-group {
+                margin-bottom: 22px;
+            }
+
+            input[type="text"],
+            input[type="password"] {
+                padding: 15px;
+                min-height: 50px;
+            }
+
+            select {
+                padding: 15px;
+                min-height: 50px;
+                padding-right: 45px;
+            }
+
+            .btn {
+                padding: 16px 20px;
+                min-height: 50px;
+            }
+        }
+
+        /* Landscape orientation adjustments */
+        @media (orientation: landscape) and (max-height: 500px) {
+            body {
+                align-items: flex-start;
+                padding-top: 15px;
+            }
+
+            .container {
+                margin-top: 0;
+            }
+
+            h1 {
+                margin-bottom: 20px;
+            }
+
+            .form-group {
+                margin-bottom: 18px;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+                color: #e2e8f0;
+            }
+
+            .container {
+                background: rgba(30, 41, 59, 0.95);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            h1 {
+                color: #f1f5f9;
+            }
+
+            label {
+                color: #cbd5e1;
+            }
+
+            .optional-label {
+                color: #64748b;
+            }
+
+            input[type="text"],
+            input[type="password"] {
+                background-color: rgba(51, 65, 85, 0.5);
+                border-color: #475569;
+                color: #f1f5f9;
+            }
+
+            select {
+                background-color: rgba(51, 65, 85, 0.5);
+                border-color: #475569;
+                color: #f1f5f9;
+            }
+
+            input[type="text"]:focus,
+            input[type="password"]:focus {
+                border-color: #60a5fa;
+                background-color: rgba(51, 65, 85, 0.7);
+            }
+
+            select:focus {
+                border-color: #60a5fa;
+                background-color: rgba(51, 65, 85, 0.7);
+            }
+
+            input[type="text"]::placeholder,
+            input[type="password"]::placeholder {
+                color: #64748b;
+            }
+
+            .ai-toggle-btn {
+                border-color: #475569;
+                color: #94a3b8;
+            }
+
+            .ai-toggle-btn:hover {
+                border-color: #64748b;
+                color: #cbd5e1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Weather Station Setup</h1>
+
+        <div id="status" class="status"></div>
+
+        <form id="configForm">
+            <div class="form-group">
+                <label for="ssid">WiFi Network (SSID)</label>
+                <input type="text" id="ssid" name="ssid" required placeholder="Enter network name"
+                    value="{{CURRENT_SSID}}" autocomplete="off" autocapitalize="none" autocorrect="off">
+            </div>
+
+            <div class="form-group">
+                <label for="password">WiFi Password</label>
+                <input type="text" id="password" name="password" required placeholder="Enter password"
+                    value="{{CURRENT_PASSWORD}}" autocomplete="off" autocapitalize="none" autocorrect="off">
+            </div>
+
+            <div class="form-group">
+                <label for="city">City</label>
+                <input type="text" id="city" name="city" placeholder="Enter city name (e.g., Berlin)"
+                    value="{{CURRENT_CITY}}" autocomplete="off" autocapitalize="none" autocorrect="off">
+            </div>
+
+            <div class="form-group">
+                <label for="countryCode">Country Code <span class="optional-label">(optional, e.g., US, DE,
+                        FR)</span></label>
+                <input type="text" id="countryCode" name="countryCode" placeholder="Enter 2-letter country code"
+                    value="{{CURRENT_COUNTRY_CODE}}" autocomplete="off" autocapitalize="none" autocorrect="off"
+                    maxlength="2" style="text-transform: uppercase;">
+            </div>
+
+            <div class="form-group">
+                <label for="imageUrl">Image URL <span class="optional-label">(optional)</span></label>
+                <input type="text" id="imageUrl" name="imageUrl"
+                    placeholder="Enter full image URL (e.g., https://example.com/image.jpg)"
+                    value="{{CURRENT_IMAGE_URL}}" autocomplete="off" autocapitalize="none" autocorrect="off">
+                <small style="color: #6b7280; font-size: 12px; margin-top: 4px; display: block;">
+                    Must return a direct image file (JPEG, PNG, BMP, etc.) that can be downloaded and processed for
+                    e-ink display.
+                </small>
+            </div>
+
+            <div class="ai-toggle-section">
+                <button type="button" class="ai-toggle-btn" id="aiToggleBtn">
+                    <span id="aiToggleIcon">▶</span> Configure AI Features (Optional)
+                </button>
+            </div>
+
+            <div class="ai-config-section" id="aiConfigSection">
+                <div class="form-group">
+                    <label for="openaiApiKey">OpenAI API Key <span class="optional-label">(optional)</span></label>
+                    <input type="text" id="openaiApiKey" name="openaiApiKey" placeholder="(for AI weather forecast)"
+                        value="{{CURRENT_OPENAI_KEY}}" autocomplete="off" autocapitalize="none" autocorrect="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="aiPromptStyle">AI Prompt Style <span class="optional-label">(optional)</span></label>
+                    <input type="text" id="aiPromptStyle" name="aiPromptStyle"
+                        placeholder="(neutral, funny, sarcastic, etc.)" value="{{CURRENT_AI_PROMPT_STYLE}}"
+                        autocomplete="off" autocapitalize="none" autocorrect="off">
+                </div>
+            </div>
+
+            <button type="submit" class="btn" id="submitBtn">Save Configuration</button>
+        </form>
+    </div>
+
+    <script>
+        // Prevent zoom on iOS when focusing inputs
+        document.addEventListener('touchstart', function () { }, { passive: true });
+
+        // Handle AI configuration toggle
+        document.getElementById('aiToggleBtn').addEventListener('click', function () {
+            const aiSection = document.getElementById('aiConfigSection');
+            const toggleIcon = document.getElementById('aiToggleIcon');
+            const isVisible = aiSection.classList.contains('show');
+
+            if (isVisible) {
+                aiSection.classList.remove('show');
+                toggleIcon.classList.remove('rotated');
+                toggleIcon.textContent = '▶';
+                this.innerHTML = '<span id="aiToggleIcon">▶</span> Configure AI Features (Optional)';
+            } else {
+                aiSection.classList.add('show');
+                toggleIcon.classList.add('rotated');
+                toggleIcon.textContent = '▼';
+                this.innerHTML = '<span id="aiToggleIcon" class="rotated">▼</span> Hide AI Features';
+            }
+        });
+
+        document.getElementById('configForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const statusDiv = document.getElementById('status');
+            const ssid = document.getElementById('ssid').value;
+            const password = document.getElementById('password').value;
+            const openaiApiKey = document.getElementById('openaiApiKey').value;
+            const aiPromptStyle = document.getElementById('aiPromptStyle').value;
+            const city = document.getElementById('city').value;
+            const countryCode = document.getElementById('countryCode').value;
+            const imageUrl = document.getElementById('imageUrl').value;
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+            statusDiv.className = 'status loading';
+            statusDiv.textContent = 'Saving configuration...';
+            statusDiv.style.display = 'flex';
+
+            try {
+                const formData = new FormData();
+                formData.append('ssid', ssid);
+                formData.append('password', password);
+                formData.append('openaiApiKey', openaiApiKey);
+                formData.append('aiPromptStyle', aiPromptStyle);
+                formData.append('city', city);
+                formData.append('countryCode', countryCode.toUpperCase());
+                formData.append('imageUrl', imageUrl);
+
+                const response = await fetch('/save', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    statusDiv.className = 'status success';
+                    statusDiv.textContent = '✓ Configuration saved! Closing window...';
+
+                    try {
+                        window.close();
+                    } catch (e) {
+                        statusDiv.textContent = '✓ Configuration saved!';
+                    }
+                } else {
+                    throw new Error('Failed to save configuration');
+                }
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = 'Error saving configuration. Please try again.';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Configuration';
+            }
+        });
+
+        // Handle virtual keyboard on mobile
+        let initialViewportHeight = window.innerHeight;
+
+        function handleViewportChange() {
+            const currentHeight = window.innerHeight;
+            const heightDifference = initialViewportHeight - currentHeight;
+
+            if (heightDifference > 150) {
+                // Virtual keyboard is likely open - adjust container position instead of body height
+                document.body.style.minHeight = currentHeight + 'px';
+                document.body.style.height = 'auto';
+                document.body.style.alignItems = 'flex-start';
+                document.body.style.paddingTop = '10px';
+            } else {
+                // Virtual keyboard is closed - restore original styles
+                document.body.style.minHeight = '100vh';
+                document.body.style.height = 'auto';
+                document.body.style.alignItems = 'center';
+                document.body.style.paddingTop = '20px';
+            }
+        }
+
+        window.addEventListener('resize', handleViewportChange);
+        window.addEventListener('orientationchange', function () {
+            setTimeout(() => {
+                initialViewportHeight = window.innerHeight;
+                handleViewportChange();
+            }, 500);
+        });
+    </script>
+</body>
+
+</html>

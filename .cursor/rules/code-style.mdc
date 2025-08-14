@@ -1,0 +1,7 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+- Never comment on the code, use clear and understandable variable names instead.
+- Use intention-revealing names in general.

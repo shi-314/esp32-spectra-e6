@@ -1,0 +1,70 @@
+#ifndef CONFIGURATION_SERVER_H
+#define CONFIGURATION_SERVER_H
+
+#include <Arduino.h>
+#include <AsyncTCP.h>
+#include <DNSServer.h>
+#include <ESPAsyncWebServer.h>
+#include <SPIFFS.h>
+
+#include <functional>
+
+struct Configuration {
+  String ssid;
+  String password;
+  String openaiApiKey;
+  String aiPromptStyle;
+  String city;
+  String countryCode;
+  String imageUrl;
+
+  Configuration() = default;
+
+  Configuration(const String &ssid, const String &password, const String &openaiApiKey, const String &aiPromptStyle,
+                const String &city, const String &countryCode, const String &imageUrl)
+      : ssid(ssid),
+        password(password),
+        openaiApiKey(openaiApiKey),
+        aiPromptStyle(aiPromptStyle),
+        city(city),
+        countryCode(countryCode),
+        imageUrl(imageUrl) {}
+};
+
+using OnSaveCallback = std::function<void(const Configuration &config)>;
+
+class ConfigurationServer {
+ public:
+  ConfigurationServer(const Configuration &currentConfig);
+  void run(OnSaveCallback onSaveCallback);
+  void stop();
+  bool isRunning() const;
+  void handleRequests();
+
+  String getWifiAccessPointName() const;
+  String getWifiAccessPointPassword() const;
+
+ private:
+  String deviceName;
+  String wifiAccessPointName;
+  String wifiAccessPointPassword;
+
+  Configuration currentConfiguration;
+
+  AsyncWebServer *server;
+  DNSServer *dnsServer;
+  bool isServerRunning;
+
+  String htmlTemplate;
+  OnSaveCallback onSaveCallback;
+
+  void setupWebServer();
+  void setupDNSServer();
+  String getConfigurationPage();
+  bool loadHtmlTemplate();
+  void handleRoot(AsyncWebServerRequest *request);
+  void handleSave(AsyncWebServerRequest *request);
+  void handleNotFound(AsyncWebServerRequest *request);
+};
+
+#endif

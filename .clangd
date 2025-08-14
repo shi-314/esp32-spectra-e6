@@ -1,0 +1,8 @@
+CompileFlags:
+  Remove: 
+    - -mlongcalls
+  Add:
+    - -w
+
+Diagnostics:
+  Suppress: "*"

@@ -1,0 +1,97 @@
+name: Build and Release Firmware
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+      
+    - name: Cache pip
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Cache PlatformIO
+      uses: actions/cache@v4
+      with:
+        path: ~/.platformio
+        key: ${{ runner.os }}-platformio-${{ hashFiles('**/platformio.ini') }}
+        restore-keys: |
+          ${{ runner.os }}-platformio-
+        
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        
+    - name: Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install --upgrade platformio
+        
+    - name: Get build info
+      id: build_info
+      run: |
+        echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        echo "timestamp=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+        echo "tag=v$(date +'%Y%m%d')-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        
+    - name: Build firmware
+      run: pio run --environment lilygo-t5-v213
+      
+    - name: Build filesystem image
+      run: pio run --target buildfs --environment lilygo-t5-v213
+      
+    - name: Prepare artifacts
+      run: |
+        mkdir -p release-artifacts
+        # Copy firmware binary
+        cp .pio/build/lilygo-t5-v213/firmware.bin release-artifacts/lilygo-t5-firmware-${{ steps.build_info.outputs.short_sha }}.bin
+        # Copy filesystem image
+        cp .pio/build/lilygo-t5-v213/spiffs.bin release-artifacts/filesystem.bin
+        
+        # Create checksums
+        cd release-artifacts
+        sha256sum *.bin > checksums.txt
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.build_info.outputs.tag }}
+        name: "LilyGO T5 Weather Station - ${{ steps.build_info.outputs.short_sha }}"
+        body: |
+          ## 🚀 Release
+          
+          **Commit:** ${{ steps.build_info.outputs.short_sha }}  
+          **Build Date:** ${{ steps.build_info.outputs.timestamp }}
+          
+          **Using esptool.py:**
+          ```bash
+          esptool.py --port /dev/ttyUSB0 write_flash 0x10000 firmware.bin
+          esptool.py --port /dev/ttyUSB0 write_flash 0x290000 filesystem.bin
+          ```
+          
+          **Using PlatformIO:**
+          ```bash
+          pio run --target upload
+          pio run --target uploadfs
+          ```
+        files: |
+          release-artifacts/*
+        draft: false
+        prerelease: false 
