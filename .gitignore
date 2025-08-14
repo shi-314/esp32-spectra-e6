@@ -4,6 +4,7 @@
 .vscode/launch.json
 .vscode/ipch
 .cache/
+.cache/**
 
 # Development configuration with credentials
 src/config_dev.h
