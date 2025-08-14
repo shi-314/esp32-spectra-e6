@@ -22,169 +22,30 @@ void ImageScreen::storeImageETag(const String& etag) {
 String ImageScreen::getStoredImageETag() { return String(storedImageETag); }
 
 int ImageScreen::downloadAndDisplayImage() {
-  HTTPClient http;
-
-  String requestUrl = ditheringServiceUrl + "/process?url=" + urlEncode(String(config.imageUrl)) +
+  String requestUrl = ditheringServiceUrl + "/process?url=" + downloader.urlEncode(String(config.imageUrl)) +
                       "&width=" + String(display.width()) + "&height=" + String(display.height()) +
                       "&dither=true&normalize=false&colors=000000,ffffff,e6e600,cc0000,0033cc,00cc00";
 
-  Serial.println("Requesting image from: " + requestUrl);
-
-  http.begin(requestUrl);
-  http.setTimeout(10000);
-
   String storedETag = getStoredImageETag();
-  if (storedETag.length() > 0) {
-    http.addHeader("If-None-Match", storedETag);
-  }
+  DownloadResult result = downloader.download(requestUrl, storedETag);
 
-  const char* headerKeys[] = {"Content-Type", "Transfer-Encoding", "ETag"};
-  size_t headerKeysSize = sizeof(headerKeys) / sizeof(char*);
-  http.collectHeaders(headerKeys, headerKeysSize);
-
-  int httpCode = http.GET();
-
-  if (httpCode == HTTP_CODE_NOT_MODIFIED) {
+  if (result.httpCode == HTTP_CODE_NOT_MODIFIED) {
     Serial.println("Image not modified (304), using cached version");
-    http.end();
-    return httpCode;
+    return result.httpCode;
   }
 
-  if (httpCode != HTTP_CODE_OK) {
-    Serial.printf("HTTP request failed with code: %d\n", httpCode);
-    Serial.printf("HTTP error: %s\n", http.errorToString(httpCode).c_str());
-    http.end();
-    return httpCode;
+  if (result.httpCode != HTTP_CODE_OK) {
+    downloader.cleanup(result);
+    return result.httpCode;
   }
 
-  // Store new ETag if present
-  String newETag = http.header("ETag");
-  if (newETag.length() > 0) {
-    storeImageETag(newETag);
+  if (result.etag.length() > 0) {
+    storeImageETag(result.etag);
   }
 
-  String contentType = http.header("Content-Type");
-  contentType.toLowerCase();
-  if (!contentType.isEmpty() && contentType != "image/bmp") {
-    Serial.println("Unexpected content type: " + contentType);
-    http.end();
-    return -1;
-  }
-
-  // Check if response is chunked
-  String transferEncoding = http.header("Transfer-Encoding");
-  bool isChunked = transferEncoding.indexOf("chunked") != -1;
-
-  if (isChunked) {
-    // For chunked responses, manually decode the chunks
-    WiFiClient* stream = http.getStreamPtr();
-
-    size_t bufferCapacity = 400 * 1024;  // 400KB buffer
-    uint8_t* data = (uint8_t*)ps_malloc(bufferCapacity);
-    if (!data) {
-      Serial.println("Failed to allocate PSRAM buffer");
-      http.end();
-      return -1;
-    }
-
-    size_t totalDataRead = 0;
-
-    while (stream->connected()) {
-      // Read chunk size line (hex number followed by \r\n)
-      char chunkSizeBuffer[16];
-      size_t lineLength = stream->readBytesUntil('\n', (uint8_t*)chunkSizeBuffer, sizeof(chunkSizeBuffer) - 1);
-      chunkSizeBuffer[lineLength] = '\0';  // Null terminate
-
-      // Remove trailing \r if present
-      if (lineLength > 0 && chunkSizeBuffer[lineLength - 1] == '\r') {
-        chunkSizeBuffer[lineLength - 1] = '\0';
-        lineLength--;
-      }
-
-      if (lineLength == 0) {
-        continue;  // Empty line, keep reading
-      }
-
-      // Parse hex chunk size
-      long chunkSize = strtol(chunkSizeBuffer, NULL, 16);
-
-      if (chunkSize == 0) {
-        break;  // End of chunks
-      }
-
-      // Expand buffer if needed
-      if (totalDataRead + chunkSize > bufferCapacity) {
-        bufferCapacity = max(bufferCapacity * 2, (size_t)(totalDataRead + chunkSize + 1024));
-
-        uint8_t* newData = (uint8_t*)ps_realloc(data, bufferCapacity);
-        if (!newData) {
-          Serial.println("Failed to expand PSRAM buffer");
-          free(data);
-          http.end();
-          return -1;
-        }
-        data = newData;
-      }
-
-      // Read the chunk data
-      size_t bytesRead = stream->readBytes(data + totalDataRead, chunkSize);
-      if (bytesRead != chunkSize) {
-        Serial.printf("Warning: Expected %ld bytes, got %d bytes\n", chunkSize, bytesRead);
-      }
-      totalDataRead += bytesRead;
-
-      // Read trailing \r\n after chunk data (2 bytes)
-      uint8_t trailer[2];
-      stream->readBytes(trailer, 2);
-    }
-
-    http.end();
-
-    if (totalDataRead == 0) {
-      Serial.println("No data received from chunked response");
-      free(data);
-      return -1;
-    }
-
-    Serial.printf("Downloaded %d bytes from web\n", totalDataRead);
-
-    return processImageData(data, totalDataRead);
-  } else {
-    // For non-chunked responses, use simple stream reading
-    WiFiClient* stream = http.getStreamPtr();
-
-    size_t bufferCapacity = 400 * 1024;
-    uint8_t* data = (uint8_t*)ps_malloc(bufferCapacity);
-    if (!data) {
-      Serial.println("Failed to allocate PSRAM buffer");
-      http.end();
-      return -1;
-    }
-
-    size_t totalRead = 0;
-    const size_t chunkSize = 1024;
-
-    while (stream->available() > 0) {
-      if (totalRead + chunkSize > bufferCapacity) {
-        bufferCapacity = bufferCapacity * 2;
-        uint8_t* newData = (uint8_t*)ps_realloc(data, bufferCapacity);
-        if (!newData) {
-          free(data);
-          http.end();
-          return -1;
-        }
-        data = newData;
-      }
-
-      size_t bytesRead = stream->readBytes(data + totalRead, chunkSize);
-      if (bytesRead == 0) break;
-      totalRead += bytesRead;
-    }
-
-    http.end();
-    Serial.printf("Downloaded %d bytes from web\n", totalRead);
-    return processImageData(data, totalRead);
-  }
+  int processResult = processImageData(result.data, result.size);
+  downloader.cleanup(result);
+  return processResult;
 }
 
 int ImageScreen::processImageData(uint8_t* data, size_t dataSize) {
@@ -585,20 +446,5 @@ void ImageScreen::displayError(const String& errorMessage) {
   } while (display.nextPage());
 }
 
-String ImageScreen::urlEncode(const String& str) {
-  String encoded = "";
-  char c;
-  for (int i = 0; i < str.length(); i++) {
-    c = str.charAt(i);
-    if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
-      encoded += c;
-    } else {
-      encoded += '%';
-      if (c < 16) encoded += '0';
-      encoded += String(c, HEX);
-    }
-  }
-  return encoded;
-}
 
 int ImageScreen::nextRefreshInSeconds() { return 900; }
