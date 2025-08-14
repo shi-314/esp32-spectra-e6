@@ -5,15 +5,10 @@
 
 #include "ApplicationConfig.h"
 #include "ApplicationConfigStorage.h"
-#include "ChatGPTClient.h"
 #include "ConfigurationScreen.h"
 #include "ConfigurationServer.h"
-#include "CurrentWeatherScreen.h"
 #include "DisplayType.h"
 #include "ImageScreen.h"
-#include "MessageScreen.h"
-#include "MeteogramWeatherScreen.h"
-#include "OpenMeteoAPI.h"
 #include "WiFiConnection.h"
 #include "WifiErrorScreen.h"
 #include "battery.h"
@@ -22,20 +17,10 @@
 std::unique_ptr<ApplicationConfig> appConfig;
 ApplicationConfigStorage configStorage;
 
-const String aiWeatherPrompt =
-    "I will share a JSON payload with you from the Open Meteo API which has weather forecast data for the current "
-    "day. You have to summarize it into one sentence:\n"
-    "- 18 words or less\n"
-    "- include the rough temperature in the sentence\n"
-    "- forecast for the whole day is included in the sentence\n"
-    "- use the time of the day to make the sentence more interesting, but don't mention the exact time\n"
-    "- don't mention the location\n"
-    "- only include the current weather and the forecast for the remaining day, not the past\n";
 
 // Standard constructor for GxEPD2
 DisplayType display(Epd2Type(EPD_CS, EPD_DC, EPD_RSET, EPD_BUSY));
 
-OpenMeteoAPI openMeteoAPI;
 
 void goToSleep(uint64_t sleepTimeInSeconds);
 int displayCurrentScreen();
@@ -44,29 +29,6 @@ bool isButtonWakeup();
 void updateConfiguration(const Configuration& config);
 void initializeDefaultConfig();
 
-void geocodeCurrentLocation() {
-  if (strlen(appConfig->city) == 0) {
-    Serial.println("No city configured, using default coordinates");
-    return;
-  }
-
-  Serial.printf("Geocoding location: %s (%s)\n", appConfig->city,
-                strlen(appConfig->countryCode) > 0 ? appConfig->countryCode : "");
-
-  GeocodingResult location = openMeteoAPI.getLocationByCity(String(appConfig->city), String(appConfig->countryCode));
-  if (location.name.length() > 0) {
-    appConfig->latitude = location.latitude;
-    appConfig->longitude = location.longitude;
-
-    strncpy(appConfig->city, location.name.c_str(), sizeof(appConfig->city) - 1);
-    strncpy(appConfig->countryCode, location.countryCode.c_str(), sizeof(appConfig->countryCode) - 1);
-
-    Serial.printf("Geocoded successfully: %s -> (%f, %f)\n", appConfig->city, appConfig->latitude,
-                  appConfig->longitude);
-  } else {
-    Serial.printf("Geocoding failed for %s, using fallback coordinates\n", appConfig->city);
-  }
-}
 
 bool isButtonWakeup() {
   esp_sleep_wakeup_cause_t wakeupReason = esp_sleep_get_wakeup_cause();
@@ -77,18 +39,12 @@ bool isButtonWakeup() {
 void cycleToNextScreen() {
   appConfig->currentScreenIndex = (appConfig->currentScreenIndex + 1) % SCREEN_COUNT;
 
-  // Skip MESSAGE_SCREEN if no OpenAI API key is configured
-  if (appConfig->currentScreenIndex == MESSAGE_SCREEN && !appConfig->hasValidOpenaiApiKey()) {
-    appConfig->currentScreenIndex = (appConfig->currentScreenIndex + 1) % SCREEN_COUNT;
-  }
-
   Serial.println("Cycled to screen: " + String(appConfig->currentScreenIndex));
 
   // NVS disabled - configuration not saved
 }
 
 int displayCurrentScreen() {
-  appConfig->currentScreenIndex = IMAGE_SCREEN;
   switch (appConfig->currentScreenIndex) {
     case CONFIG_SCREEN: {
       ConfigurationScreen configurationScreen(display);
@@ -118,48 +74,18 @@ int displayCurrentScreen() {
       configurationServer.stop();
       return configurationScreen.nextRefreshInSeconds();
     }
-    case CURRENT_WEATHER_SCREEN: {
-      WeatherForecast forecastData = openMeteoAPI.getForecast(appConfig->latitude, appConfig->longitude);
-      CurrentWeatherScreen currentWeatherScreen(display, forecastData, String(appConfig->city),
-                                                String(appConfig->countryCode));
-      currentWeatherScreen.render();
-      return currentWeatherScreen.nextRefreshInSeconds();
-    }
-    case METEOGRAM_SCREEN: {
-      WeatherForecast forecastData = openMeteoAPI.getForecast(appConfig->latitude, appConfig->longitude);
-      MeteogramWeatherScreen meteogramWeatherScreen(display, forecastData);
-      meteogramWeatherScreen.render();
-      return meteogramWeatherScreen.nextRefreshInSeconds();
-    }
-    case MESSAGE_SCREEN: {
-      WeatherForecast forecastData = openMeteoAPI.getForecast(appConfig->latitude, appConfig->longitude);
-
-      String prompt = aiWeatherPrompt;
-      prompt += "- Use the following style: " + String(appConfig->aiPromptStyle) + "\n";
-      prompt += forecastData.apiPayload;
-
-      ChatGPTClient chatGPTClient(appConfig->openaiApiKey);
-      String chatGPTResponse = chatGPTClient.generateContent(prompt);
-
-      MessageScreen messageScreen(display);
-      messageScreen.setMessageText(chatGPTResponse);
-      messageScreen.render();
-      return messageScreen.nextRefreshInSeconds();
-    }
     case IMAGE_SCREEN: {
       ImageScreen imageScreen(display, *appConfig);
       imageScreen.render();
       return imageScreen.nextRefreshInSeconds();
     }
     default: {
-      Serial.println("Unknown screen index, defaulting to current weather");
-      appConfig->currentScreenIndex = CURRENT_WEATHER_SCREEN;
+      Serial.println("Unknown screen index, defaulting to image screen");
+      appConfig->currentScreenIndex = IMAGE_SCREEN;
 
-      WeatherForecast forecastData = openMeteoAPI.getForecast(appConfig->latitude, appConfig->longitude);
-      CurrentWeatherScreen currentWeatherScreen(display, forecastData, String(appConfig->city),
-                                                String(appConfig->countryCode));
-      currentWeatherScreen.render();
-      return currentWeatherScreen.nextRefreshInSeconds();
+      ImageScreen imageScreen(display, *appConfig);
+      imageScreen.render();
+      return imageScreen.nextRefreshInSeconds();
     }
   }
 }
@@ -309,11 +235,6 @@ void setup() {
       int refreshSeconds = errorScreen.nextRefreshInSeconds();
       goToSleep(refreshSeconds);
       return;
-    }
-
-    if (isnan(appConfig->latitude) || isnan(appConfig->longitude)) {
-      geocodeCurrentLocation();
-      // NVS disabled - coordinates not saved
     }
   }
 

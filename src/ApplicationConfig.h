@@ -10,11 +10,8 @@
 
 enum ScreenType {
   CONFIG_SCREEN = 0,
-  CURRENT_WEATHER_SCREEN = 1,
-  METEOGRAM_SCREEN = 2,
-  MESSAGE_SCREEN = 3,
-  IMAGE_SCREEN = 4,
-  SCREEN_COUNT = 5
+  IMAGE_SCREEN = 1,
+  SCREEN_COUNT = 2
 };
 
 struct ApplicationConfig {
@@ -49,7 +46,7 @@ struct ApplicationConfig {
     latitude = DEFAULT_LATITUDE;
     longitude = DEFAULT_LONGITUDE;
 
-    currentScreenIndex = CURRENT_WEATHER_SCREEN;
+    currentScreenIndex = IMAGE_SCREEN;
   }
 
   bool hasValidWiFiCredentials() const { return strlen(wifiSSID) > 0 && strlen(wifiPassword) > 0; }
