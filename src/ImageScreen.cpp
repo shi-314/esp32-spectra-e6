@@ -8,7 +8,7 @@
 ImageScreen::ImageScreen(DisplayType& display, ApplicationConfig& config)
     : display(display),
       config(config),
-      smallFont(u8g2_font_helvR08_tr),
+      smallFont(u8g2_font_helvR12_tr),
       ditheringServiceUrl("https://dither.lab.shvn.dev") {
   gfx.begin(display);
 }
@@ -214,8 +214,6 @@ std::unique_ptr<ColorImageBitmaps> ImageScreen::processImageData(uint8_t* data, 
 }
 
 void ImageScreen::renderBitmaps(const ColorImageBitmaps& bitmaps) {
-  display.init(115200);
-
   // Calculate position to center the image on display
   int displayWidth = display.width();
   int displayHeight = display.height();
@@ -236,20 +234,12 @@ void ImageScreen::renderBitmaps(const ColorImageBitmaps& bitmaps) {
   imageX = max(0, imageX);
   imageY = max(0, imageY);
 
-  // Display the image directly without chunking
-  display.setFullWindow();
-  display.fillScreen(GxEPD_WHITE);
-
   // Draw all color bitmaps directly
   display.drawBitmap(imageX, imageY, bitmaps.blackBitmap, bitmaps.width, bitmaps.height, GxEPD_BLACK);
   display.drawBitmap(imageX, imageY, bitmaps.yellowBitmap, bitmaps.width, bitmaps.height, GxEPD_YELLOW);
   display.drawBitmap(imageX, imageY, bitmaps.redBitmap, bitmaps.width, bitmaps.height, GxEPD_RED);
   display.drawBitmap(imageX, imageY, bitmaps.blueBitmap, bitmaps.width, bitmaps.height, GxEPD_BLUE);
   display.drawBitmap(imageX, imageY, bitmaps.greenBitmap, bitmaps.width, bitmaps.height, GxEPD_GREEN);
-
-  display.display();
-
-  display.hibernate();
 }
 
 void ImageScreen::render() {
@@ -259,6 +249,10 @@ void ImageScreen::render() {
     Serial.println("Image not modified (304), using cached version");
     return;
   }
+
+  display.init(115200);
+  display.setFullWindow();
+  display.fillScreen(GxEPD_WHITE);
 
   if (downloadResult->httpCode != HTTP_CODE_OK) {
     displayError("Failed to download image");
@@ -272,19 +266,18 @@ void ImageScreen::render() {
   }
 
   renderBitmaps(*bitmaps);
+  displayBatteryStatus();
+
+  display.display();
+  display.hibernate();
 }
 
 void ImageScreen::displayError(const String& errorMessage) {
   Serial.println("ImageScreen Error: " + errorMessage);
 
-  display.init(115200);
-
   gfx.setFontMode(1);
   gfx.setForegroundColor(GxEPD_BLACK);
   gfx.setBackgroundColor(GxEPD_WHITE);
-
-  display.setFullWindow();
-  display.fillScreen(GxEPD_WHITE);
 
   gfx.setFont(smallFont);
 
@@ -297,8 +290,22 @@ void ImageScreen::displayError(const String& errorMessage) {
   gfx.setCursor(x, y);
   gfx.print(errorMessage);
 
-  display.display();
-  display.hibernate();
+  displayBatteryStatus();
+}
+
+void ImageScreen::displayBatteryStatus() {
+  String batteryStatus = getBatteryStatus();
+  gfx.setFontMode(0);
+  gfx.setBackgroundColor(GxEPD_WHITE);
+  gfx.setForegroundColor(GxEPD_BLACK);
+  gfx.setFont(smallFont);
+
+  int textWidth = gfx.getUTF8Width(batteryStatus.c_str());
+  int batteryX = 20;
+  int batteryY = 20;
+
+  gfx.setCursor(batteryX, batteryY);
+  gfx.print(batteryStatus);
 }
 
 int ImageScreen::nextRefreshInSeconds() { return 300; }

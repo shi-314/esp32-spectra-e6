@@ -53,6 +53,7 @@ class ImageScreen : public Screen {
   std::unique_ptr<ColorImageBitmaps> processImageData(uint8_t* data, size_t dataSize);
   void renderBitmaps(const ColorImageBitmaps& bitmaps);
   void displayError(const String& errorMessage);
+  void displayBatteryStatus();
   void storeImageETag(const String& etag);
   String getStoredImageETag();
 
