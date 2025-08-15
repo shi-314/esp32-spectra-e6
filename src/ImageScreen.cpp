@@ -235,38 +235,18 @@ void ImageScreen::renderBitmaps(const ColorImageBitmaps& bitmaps) {
   imageX = max(0, imageX);
   imageY = max(0, imageY);
 
-  // Display the image using chunked rendering due to buffer limitations
-  // DisplayType uses HEIGHT/4 buffer, so we need to render in 4 chunks
-  const int chunkHeight = bitmaps.height / 4;      // 480/4 = 120 pixels per chunk
-  int bitmapWidthBytes = (bitmaps.width + 7) / 8;  // Round up to nearest byte
-
+  // Display the image directly without chunking
   display.setFullWindow();
   display.fillScreen(GxEPD_WHITE);
 
-  // Render all chunks to buffer without individual display updates
-  display.firstPage();
-  do {
-    for (int chunk = 0; chunk < 4; chunk++) {
-      int startY = chunk * chunkHeight;
-      int endY = min(startY + chunkHeight, (int)bitmaps.height);
-      int actualChunkHeight = endY - startY;
+  // Draw all color bitmaps directly
+  display.drawBitmap(imageX, imageY, bitmaps.blackBitmap, bitmaps.width, bitmaps.height, GxEPD_BLACK);
+  display.drawBitmap(imageX, imageY, bitmaps.yellowBitmap, bitmaps.width, bitmaps.height, GxEPD_YELLOW);
+  display.drawBitmap(imageX, imageY, bitmaps.redBitmap, bitmaps.width, bitmaps.height, GxEPD_RED);
+  display.drawBitmap(imageX, imageY, bitmaps.blueBitmap, bitmaps.width, bitmaps.height, GxEPD_BLUE);
+  display.drawBitmap(imageX, imageY, bitmaps.greenBitmap, bitmaps.width, bitmaps.height, GxEPD_GREEN);
 
-      // Calculate bitmap offsets for this chunk
-      int bitmapChunkOffset = startY * bitmapWidthBytes;
-
-      // Draw chunk portion of each bitmap to the buffer
-      display.drawBitmap(imageX, imageY + startY, bitmaps.blackBitmap + bitmapChunkOffset, bitmaps.width,
-                         actualChunkHeight, GxEPD_BLACK);
-      display.drawBitmap(imageX, imageY + startY, bitmaps.yellowBitmap + bitmapChunkOffset, bitmaps.width,
-                         actualChunkHeight, GxEPD_YELLOW);
-      display.drawBitmap(imageX, imageY + startY, bitmaps.redBitmap + bitmapChunkOffset, bitmaps.width,
-                         actualChunkHeight, GxEPD_RED);
-      display.drawBitmap(imageX, imageY + startY, bitmaps.blueBitmap + bitmapChunkOffset, bitmaps.width,
-                         actualChunkHeight, GxEPD_BLUE);
-      display.drawBitmap(imageX, imageY + startY, bitmaps.greenBitmap + bitmapChunkOffset, bitmaps.width,
-                         actualChunkHeight, GxEPD_GREEN);
-    }
-  } while (display.nextPage());
+  display.display();
 
   display.hibernate();
 }
@@ -297,27 +277,27 @@ void ImageScreen::displayError(const String& errorMessage) {
   Serial.println("ImageScreen Error: " + errorMessage);
 
   display.init(115200);
-  display.setRotation(1);
 
   gfx.setFontMode(1);
   gfx.setForegroundColor(GxEPD_BLACK);
   gfx.setBackgroundColor(GxEPD_WHITE);
 
   display.setFullWindow();
-  display.firstPage();
-  do {
-    display.fillScreen(GxEPD_WHITE);
-    gfx.setFont(smallFont);
+  display.fillScreen(GxEPD_WHITE);
 
-    int textWidth = gfx.getUTF8Width(errorMessage.c_str());
-    int textHeight = gfx.getFontAscent() - gfx.getFontDescent();
+  gfx.setFont(smallFont);
 
-    int x = (display.width() - textWidth) / 2;
-    int y = (display.height() + textHeight) / 2;
+  int textWidth = gfx.getUTF8Width(errorMessage.c_str());
+  int textHeight = gfx.getFontAscent() - gfx.getFontDescent();
 
-    gfx.setCursor(x, y);
-    gfx.print(errorMessage);
-  } while (display.nextPage());
+  int x = (display.width() - textWidth) / 2;
+  int y = (display.height() + textHeight) / 2;
+
+  gfx.setCursor(x, y);
+  gfx.print(errorMessage);
+
+  display.display();
+  display.hibernate();
 }
 
 int ImageScreen::nextRefreshInSeconds() { return 900; }
