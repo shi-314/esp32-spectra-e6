@@ -14,6 +14,7 @@
 #include "WiFiConnection.h"
 #include "battery.h"
 #include "boards.h"
+#include "esp32-hal.h"
 
 std::unique_ptr<ApplicationConfig> appConfig;
 ApplicationConfigStorage configStorage;
@@ -22,8 +23,7 @@ ApplicationConfigStorage configStorage;
 DisplayType display(Epd2Type(EPD_CS, EPD_DC, EPD_RSET, EPD_BUSY));
 
 void goToSleep(uint64_t sleepTimeInSeconds);
-int displayCurrentScreen();
-void cycleToNextScreen();
+int displayCurrentScreen(bool wifiConnected);
 bool isButtonWakeup();
 void updateConfiguration(const Configuration& config);
 void initializeDefaultConfig();
@@ -34,47 +34,33 @@ bool isButtonWakeup() {
   return (wakeupReason == ESP_SLEEP_WAKEUP_EXT0);
 }
 
-void cycleToNextScreen() {
-  appConfig->currentScreenIndex = (appConfig->currentScreenIndex + 1) % SCREEN_COUNT;
-
-  Serial.println("Cycled to screen: " + String(appConfig->currentScreenIndex));
-
-  configStorage.save(*appConfig);
-}
-
-int displayCurrentScreen() {
-  switch (appConfig->currentScreenIndex) {
-    case CONFIG_SCREEN: {
-      ConfigurationScreen configurationScreen(display);
-      configurationScreen.render();
-
-      Configuration currentConfig = Configuration(appConfig->wifiSSID, appConfig->wifiPassword, appConfig->imageUrl);
-      ConfigurationServer configurationServer(currentConfig);
-
-      configurationServer.run(updateConfiguration);
-
-      while (configurationServer.isRunning()) {
-        configurationServer.handleRequests();
-
-        delay(10);
-      }
-
-      configurationServer.stop();
-      return configurationScreen.nextRefreshInSeconds();
+int displayCurrentScreen(bool wifiConnected) {
+  if (!appConfig->hasValidWiFiCredentials() || !wifiConnected) {
+    if (!appConfig->hasValidWiFiCredentials()) {
+      Serial.println("No valid WiFi credentials, showing configuration screen");
+    } else {
+      Serial.println("Failed to connect to WiFi, showing configuration screen");
     }
-    case IMAGE_SCREEN: {
-      ImageScreen imageScreen(display, *appConfig);
-      imageScreen.render();
-      return imageScreen.nextRefreshInSeconds();
-    }
-    default: {
-      Serial.println("Unknown screen index, defaulting to image screen");
-      appConfig->currentScreenIndex = IMAGE_SCREEN;
 
-      ImageScreen imageScreen(display, *appConfig);
-      imageScreen.render();
-      return imageScreen.nextRefreshInSeconds();
+    ConfigurationScreen configurationScreen(display);
+    configurationScreen.render();
+
+    Configuration currentConfig = Configuration(appConfig->wifiSSID, appConfig->wifiPassword, appConfig->imageUrl);
+    ConfigurationServer configurationServer(currentConfig);
+
+    configurationServer.run(updateConfiguration);
+
+    while (configurationServer.isRunning()) {
+      configurationServer.handleRequests();
+      delay(10);
     }
+
+    configurationServer.stop();
+    return configurationScreen.nextRefreshInSeconds();
+  } else {
+    ImageScreen imageScreen(display, *appConfig);
+    imageScreen.render();
+    return imageScreen.nextRefreshInSeconds();
   }
 }
 
@@ -113,6 +99,10 @@ void updateConfiguration(const Configuration& config) {
   Serial.println("Configuration updated");
   Serial.println("WiFi SSID: " + String(appConfig->wifiSSID));
   Serial.println("Image URL: " + String(strlen(appConfig->imageUrl) > 0 ? appConfig->imageUrl : "[NOT SET]"));
+
+  Serial.println("Rebooting device to apply new configuration...");
+  delay(1000);
+  ESP.restart();
 }
 
 void goToSleep(uint64_t sleepTimeInSeconds) {
@@ -139,6 +129,7 @@ void initializeDefaultConfig() {
 }
 
 void setup() {
+  delay(10000);
   Serial.begin(115200);
 
   initializeDefaultConfig();
@@ -150,23 +141,15 @@ void setup() {
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LED_ON);
 
-  if (appConfig->currentScreenIndex != CONFIG_SCREEN) {
-    if (!appConfig->hasValidWiFiCredentials()) {
-      Serial.println("No valid WiFi credentials found, switching to configuration screen");
-      appConfig->currentScreenIndex = CONFIG_SCREEN;
-    } else {
-      Serial.printf("WiFi credentials loaded: SSID='%s', Password length=%d\n", appConfig->wifiSSID,
-                    strlen(appConfig->wifiPassword));
-      WiFiConnection wifi(appConfig->wifiSSID, appConfig->wifiPassword);
-      wifi.connect();
-      if (!wifi.isConnected()) {
-        Serial.println("Failed to connect to WiFi, switching to configuration screen");
-        appConfig->currentScreenIndex = CONFIG_SCREEN;
-      }
-    }
+  // Try to connect to WiFi if we have valid credentials
+  WiFiConnection wifi(appConfig->wifiSSID, appConfig->wifiPassword);
+  if (appConfig->hasValidWiFiCredentials()) {
+    Serial.printf("WiFi credentials loaded: SSID='%s', Password length=%d\n", appConfig->wifiSSID,
+                  strlen(appConfig->wifiPassword));
+    wifi.connect();
   }
 
-  int refreshSeconds = displayCurrentScreen();
+  int refreshSeconds = displayCurrentScreen(wifi.isConnected());
   goToSleep(refreshSeconds);
 }
 
