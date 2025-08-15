@@ -47,55 +47,76 @@ void ConfigurationScreen::render() {
   Serial.println("Displaying configuration screen with QR code");
 
   display.init(115200);
+  Serial.printf("Display dimensions: %d x %d\n", display.width(), display.height());
 
-  const int textLeftMargin = 8;
-  const int textLineSpacing = 14;
-  const int qrCodePixelScale = 3;
+  const int textLeftMargin = 40;
+  const int titleFontSize = 24;
+  const int instructionFontSize = 18;
+  const int lineSpacing = 45;
+  const int qrCodeScale = 6;
   const int qrCodeModuleCount = 33;
-  const int qrCodePixelSize = qrCodeModuleCount * qrCodePixelScale;
-  const int qrCodeQuietZonePixels = 4;
+  const int qrCodePixelSize = qrCodeModuleCount * qrCodeScale;
+  const int qrCodeQuietZone = 20;
 
   String wifiQRCodeString = generateWiFiQRString();
 
-  int qrCodePositionX = display.width() - qrCodePixelSize - qrCodeQuietZonePixels;
-  int qrCodePositionY = (display.height() - qrCodePixelSize) / 2;
+  int qrCodeX = display.width() - qrCodePixelSize - qrCodeQuietZone - 40;
+  int qrCodeY = (display.height() - qrCodePixelSize) / 2;
 
   gfx.setFontMode(1);
+  gfx.setForegroundColor(GxEPD_BLUE);
   gfx.setForegroundColor(GxEPD_BLACK);
-  gfx.setBackgroundColor(GxEPD_WHITE);
 
   display.setFullWindow();
   display.fillScreen(GxEPD_WHITE);
 
-  drawQRCode(wifiQRCodeString, qrCodePositionX, qrCodePositionY, qrCodePixelScale);
-  int currentTextLineY = 18;
+  display.fillRect(0, 0, display.width(), 80, GxEPD_BLUE);
 
-  // Draw gear icon and title
-  gfx.setFont(u8g2_font_open_iconic_embedded_2x_t);
-  gfx.setCursor(textLeftMargin, currentTextLineY + 12);
-  gfx.print((char)66);  // gear icon
+  gfx.setFont(u8g2_font_open_iconic_embedded_4x_t);
+  gfx.setForegroundColor(GxEPD_WHITE);
+  gfx.setCursor(textLeftMargin, 55);
+  gfx.print((char)66);
 
-  gfx.setFont(u8g2_font_helvB08_tr);
-  gfx.setCursor(textLeftMargin + 20, currentTextLineY + 8);
-  gfx.print("Config Mode");
-  currentTextLineY += textLineSpacing * 2;
+  gfx.setFont(u8g2_font_fur17_tr);
+  gfx.setCursor(textLeftMargin + 40, 50);
+  gfx.print("Configuration Mode");
 
-  // Draw instructions
-  gfx.setFont(u8g2_font_helvR08_tr);
-  gfx.setCursor(textLeftMargin, currentTextLineY);
-  gfx.print("1. Scan QR code");
-  currentTextLineY += textLineSpacing;
+  gfx.setBackgroundColor(GxEPD_WHITE);
+  gfx.setForegroundColor(GxEPD_BLACK);
 
-  gfx.setCursor(textLeftMargin, currentTextLineY);
-  gfx.print("2. Connect to WiFi");
-  currentTextLineY += textLineSpacing;
+  int currentY = 140;
 
-  gfx.setCursor(textLeftMargin, currentTextLineY);
-  gfx.print("3. Configure");
-  currentTextLineY += textLineSpacing;
+  gfx.setFont(u8g2_font_fur17_tr);
 
-  gfx.setCursor(textLeftMargin, currentTextLineY);
-  gfx.print("4. Save & Exit");
+  gfx.setCursor(textLeftMargin, currentY);
+  gfx.print("1. Scan QR code with your phone");
+  currentY += lineSpacing;
+
+  gfx.setCursor(textLeftMargin, currentY);
+  gfx.print("2. Connect to WiFi network:");
+  currentY += 25;
+
+  gfx.setFont(u8g2_font_courB14_tr);
+  gfx.setCursor(textLeftMargin + 30, currentY);
+  gfx.print("WeatherStation-Config");
+  currentY += lineSpacing;
+
+  gfx.setFont(u8g2_font_fur17_tr);
+  gfx.setCursor(textLeftMargin, currentY);
+  gfx.print("3. Open web browser and configure");
+  currentY += lineSpacing;
+
+  gfx.setCursor(textLeftMargin, currentY);
+  gfx.print("4. Save settings and exit");
+
+  int qrBgX = qrCodeX - qrCodeQuietZone;
+  int qrBgY = qrCodeY - qrCodeQuietZone;
+  int qrBgSize = qrCodePixelSize + (2 * qrCodeQuietZone);
+
+  display.fillRect(qrBgX - 5, qrBgY - 5, qrBgSize + 10, qrBgSize + 10, GxEPD_RED);
+  display.fillRect(qrBgX, qrBgY, qrBgSize, qrBgSize, GxEPD_WHITE);
+
+  drawQRCode(wifiQRCodeString, qrCodeX, qrCodeY, qrCodeScale);
 
   display.display();
   display.hibernate();
