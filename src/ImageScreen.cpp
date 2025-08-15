@@ -301,4 +301,4 @@ void ImageScreen::displayError(const String& errorMessage) {
   display.hibernate();
 }
 
-int ImageScreen::nextRefreshInSeconds() { return 900; }
+int ImageScreen::nextRefreshInSeconds() { return 300; }
