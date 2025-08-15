@@ -299,11 +299,26 @@ void ImageScreen::displayBatteryStatus() {
   gfx.setFontMode(0);
   gfx.setBackgroundColor(GxEPD_WHITE);
   gfx.setForegroundColor(GxEPD_BLACK);
-  gfx.setFont(smallFont);
+  gfx.setFont(u8g2_font_helvB08_tr);
 
   int textWidth = gfx.getUTF8Width(batteryStatus.c_str());
-  int batteryX = 20;
-  int batteryY = 20;
+  int textHeight = gfx.getFontAscent() - gfx.getFontDescent();
+  int fontAscent = gfx.getFontAscent();
+
+  int paddingX = 6;
+  int paddingY = 4;
+  int rectWidth = textWidth + (2 * paddingX);
+  int rectHeight = textHeight + (2 * paddingY);
+
+  int rectX = display.width() - rectWidth - 18;
+  int rectY = display.height() - rectHeight - 4;
+
+  // Calculate centered text position within the rectangle
+  int batteryX = rectX + (rectWidth - textWidth) / 2;
+  int batteryY = rectY + rectHeight / 2 + fontAscent / 2;
+
+  // Draw white rounded rectangle background
+  display.fillRoundRect(rectX, rectY, rectWidth, rectHeight, 4, GxEPD_WHITE);
 
   gfx.setCursor(batteryX, batteryY);
   gfx.print(batteryStatus);
