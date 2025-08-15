@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include <WiFi.h>
+#include <esp_task_wdt.h>
 #include <time.h>
 
 #include <memory>
@@ -54,14 +56,6 @@ int displayCurrentScreen() {
 
       while (configurationServer.isRunning()) {
         configurationServer.handleRequests();
-
-        if (digitalRead(BUTTON_1) == LOW) {
-          delay(50);
-          if (digitalRead(BUTTON_1) == LOW) {
-            Serial.println("Button pressed - exiting configuration mode");
-            break;
-          }
-        }
 
         delay(10);
       }
@@ -128,7 +122,6 @@ void goToSleep(uint64_t sleepTimeInSeconds) {
 
   uint64_t sleepTimeMicros = sleepTimeInSeconds * 1000000ULL;
   // Temporarily disable button wakeup to test if it's causing premature wakeups
-  // esp_sleep_enable_ext0_wakeup((gpio_num_t)BUTTON_1, 0);
   esp_sleep_enable_timer_wakeup(sleepTimeMicros);
   esp_deep_sleep_start();
 }
@@ -152,18 +145,12 @@ void setup() {
   initializeDefaultConfig();
 
   pinMode(BATTERY_PIN, INPUT);
-  pinMode(BUTTON_1, INPUT_PULLUP);
 
-  // Initialize SPI for display
   SPI.begin(EPD_SCLK, EPD_MISO, EPD_MOSI, EPD_CS);
 
   // Initialize LED and turn it on
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LED_ON);
-  Serial.printf("LED initialized and turned on (GPIO %d)\n", LED_PIN);
-
-  // Check button state at startup
-  Serial.printf("Button pin state at startup: %d\n", digitalRead(BUTTON_1));
 
   if (!isButtonWakeup()) {
     if (!appConfig->hasValidWiFiCredentials()) {
@@ -176,6 +163,8 @@ void setup() {
   // }
 
   if (appConfig->currentScreenIndex != CONFIG_SCREEN) {
+    Serial.printf("WiFi credentials loaded: SSID='%s', Password length=%d\n", appConfig->wifiSSID,
+                  strlen(appConfig->wifiPassword));
     WiFiConnection wifi(appConfig->wifiSSID, appConfig->wifiPassword);
     wifi.connect();
     if (!wifi.isConnected()) {
