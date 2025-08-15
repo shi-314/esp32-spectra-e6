@@ -12,7 +12,6 @@
 #include "DisplayType.h"
 #include "ImageScreen.h"
 #include "WiFiConnection.h"
-#include "WifiErrorScreen.h"
 #include "battery.h"
 #include "boards.h"
 
@@ -148,19 +147,8 @@ void setup() {
 
   SPI.begin(EPD_SCLK, EPD_MISO, EPD_MOSI, EPD_CS);
 
-  // Initialize LED and turn it on
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LED_ON);
-
-  if (!isButtonWakeup()) {
-    if (!appConfig->hasValidWiFiCredentials()) {
-      appConfig->currentScreenIndex = CONFIG_SCREEN;
-    }
-  }
-
-  // if (isButtonWakeup()) {
-  //   cycleToNextScreen();
-  // }
 
   if (appConfig->currentScreenIndex != CONFIG_SCREEN) {
     Serial.printf("WiFi credentials loaded: SSID='%s', Password length=%d\n", appConfig->wifiSSID,
@@ -168,12 +156,8 @@ void setup() {
     WiFiConnection wifi(appConfig->wifiSSID, appConfig->wifiPassword);
     wifi.connect();
     if (!wifi.isConnected()) {
-      Serial.println("Failed to connect to WiFi");
-      WifiErrorScreen errorScreen(display);
-      errorScreen.render();
-      int refreshSeconds = errorScreen.nextRefreshInSeconds();
-      goToSleep(refreshSeconds);
-      return;
+      Serial.println("Failed to connect to WiFi, switching to configuration screen");
+      appConfig->currentScreenIndex = CONFIG_SCREEN;
     }
   }
 
