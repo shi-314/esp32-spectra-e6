@@ -1,10 +1,12 @@
 #ifndef CONFIGURATION_SCREEN_H
 #define CONFIGURATION_SCREEN_H
 
-#include <memory>
 #include <U8g2_for_Adafruit_GFX.h>
 #include <qrcode.h>
 
+#include <memory>
+
+#include "ApplicationConfig.h"
 #include "DisplayType.h"
 #include "Screen.h"
 

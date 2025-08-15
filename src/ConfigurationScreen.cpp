@@ -50,6 +50,7 @@ void ConfigurationScreen::render() {
   Serial.println("Displaying configuration screen with QR code");
 
   display.init(115200);
+  display.setRotation(ApplicationConfig::DISPLAY_ROTATION);
   Serial.printf("Display dimensions: %d x %d\n", display.width(), display.height());
 
   const int textLeftMargin = 40;

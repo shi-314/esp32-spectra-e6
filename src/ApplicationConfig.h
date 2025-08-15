@@ -15,6 +15,8 @@ struct ApplicationConfig {
   char wifiPassword[64];
   char imageUrl[300];
 
+  static const int DISPLAY_ROTATION = 2;
+
   ApplicationConfig() {
     memset(wifiSSID, 0, sizeof(wifiSSID));
     memset(wifiPassword, 0, sizeof(wifiPassword));

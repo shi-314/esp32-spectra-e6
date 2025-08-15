@@ -251,6 +251,7 @@ void ImageScreen::render() {
   }
 
   display.init(115200);
+  display.setRotation(ApplicationConfig::DISPLAY_ROTATION);
   display.setFullWindow();
   display.fillScreen(GxEPD_WHITE);
 
