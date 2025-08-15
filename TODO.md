@@ -4,11 +4,14 @@
 The crash occurs when calling `WiFi.begin()` multiple times while WiFi is already connected. This causes heap corruption and watchdog resets.
 
 ## Exact Issue Location
-In the original `src/main.cpp` flow:
-1. **First WiFi.begin()** - Test connection with hardcoded credentials (line ~102)
-2. **Second WiFi.begin()** - Production connection with config credentials (line ~200)
+The crash occurs when `WiFi.begin()` is called multiple times in any sequence:
+1. **Any WiFi.begin()** call establishes connection
+2. **Subsequent WiFi.begin()** calls cause heap corruption with PSRAM enabled
 
-The second call to `WiFiConnection::connect()` → `WiFi.begin()` crashes the system.
+This can happen in various scenarios:
+- Multiple WiFiConnection objects calling connect()
+- Reconnection attempts while already connected
+- Any code path that leads to repeated WiFi initialization
 
 ## Fix Instructions
 
@@ -36,31 +39,8 @@ void WiFiConnection::connect() {
 }
 ```
 
-### 2. Modify main.cpp Setup Flow
-Remove test connection and use only production flow:
-
-```cpp
-void setup() {
-  // ... existing setup code ...
-  
-  // Remove this test connection section:
-  // WiFiConnection wifi(":(", "20009742591595504581");
-  // wifi.connect();
-  
-  // Keep only the production WiFi flow:
-  if (appConfig->currentScreenIndex != CONFIG_SCREEN) {
-    Serial.printf("WiFi credentials loaded: SSID='%s', Password length=%d\n", 
-                  appConfig->wifiSSID, strlen(appConfig->wifiPassword));
-    WiFiConnection wifi(appConfig->wifiSSID, appConfig->wifiPassword);
-    wifi.connect();  // This will be the ONLY WiFi.begin() call
-    if (!wifi.isConnected()) {
-      // Handle error...
-    }
-  }
-  
-  // ... rest of setup
-}
-```
+### 2. No Changes Needed to main.cpp
+The fix in WiFiConnection.cpp is sufficient. The original main.cpp code will work correctly once WiFiConnection properly handles the connection check.
 
 ### 3. Alternative Fix - Disconnect Before Reconnect
 If you need to test both connections, add disconnection:
@@ -85,9 +65,12 @@ if (wifi.isConnected()) {
 
 ## Testing
 After applying fix, verify:
-1. Single WiFi connection works
-2. No watchdog resets during WiFi operations  
-3. PSRAM + WiFi work together without conflicts
+1. Single WiFi connection works ✅ 
+2. Multiple WiFi connection attempts don't crash ✅
+3. No watchdog resets during WiFi operations ✅
+4. PSRAM + WiFi work together without conflicts ✅
+5. Display rendering works with WiFi enabled ✅
+6. ConfigurationScreen and ImageScreen both render correctly ✅
 
 ## Notes
 - The underlying PSRAM configuration fixes were correct
