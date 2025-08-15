@@ -10,28 +10,25 @@ WiFiConnection::WiFiConnection(const char* ssid, const char* password)
 
 void WiFiConnection::connect() {
   Serial.printf("Connecting to WiFi: %s\n", _ssid);
-  
+
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("WiFi already connected, skipping reconnection");
     connected = true;
     return;
   }
-  
-  WiFi.mode(WIFI_STA);
+
   WiFi.begin(_ssid, _password);
-  
+
   int attempts = 0;
   const int maxAttempts = 20;
   while (WiFi.status() != WL_CONNECTED && attempts < maxAttempts) {
     delay(500);
-    Serial.printf("WiFi status: %d, attempt: %d/%d\n", WiFi.status(), attempts + 1, maxAttempts);
     attempts++;
-    yield();  // Keep system responsive
+    yield();
   }
+
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\nConnected to WiFi");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
+    Serial.println("Connected to WiFi");
     connected = true;
   } else {
     Serial.println("\nFailed to connect to WiFi");

@@ -16,7 +16,7 @@
 // #define BUTTON_1 0   // Boot button on LilyGO T7-S3
 
 // Battery monitoring
-#define BATTERY_PIN 35  // ADC pin for battery monitoring
+#define BATTERY_PIN 1   // ADC1_CH0 pin for battery monitoring on LilyGO T7-S3 (connected via voltage divider)
 
 // LED configuration (built-in LED on LilyGO T7 S3)
 #define LED_PIN 17     // Built-in LED on GPIO17

@@ -1,7 +1,7 @@
 #include <Arduino.h>
-#include <time.h>
 #include <WiFi.h>
 #include <esp_task_wdt.h>
+#include <time.h>
 
 #include <memory>
 
@@ -56,7 +56,6 @@ int displayCurrentScreen() {
 
       while (configurationServer.isRunning()) {
         configurationServer.handleRequests();
-
 
         delay(10);
       }
@@ -142,32 +141,16 @@ void initializeDefaultConfig() {
 
 void setup() {
   Serial.begin(115200);
-  delay(2000);  // Wait for serial monitor to connect
-  
-  Serial.println("\n=== ESP32-S3 Boot Info ===");
-  
-  // Check PSRAM status
-  Serial.printf("Free PSRAM: %d bytes\n", ESP.getFreePsram());
-  Serial.printf("Total PSRAM: %d bytes\n", ESP.getPsramSize());
-  
-  Serial.println("==========================");
-
-  // Disable task watchdog to prevent WiFi+PSRAM issues
-  esp_task_wdt_deinit();
-  
 
   initializeDefaultConfig();
 
   pinMode(BATTERY_PIN, INPUT);
 
-  // Initialize SPI for display
   SPI.begin(EPD_SCLK, EPD_MISO, EPD_MOSI, EPD_CS);
 
   // Initialize LED and turn it on
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LED_ON);
-  Serial.printf("LED initialized and turned on (GPIO %d)\n", LED_PIN);
-
 
   if (!isButtonWakeup()) {
     if (!appConfig->hasValidWiFiCredentials()) {
@@ -180,8 +163,8 @@ void setup() {
   // }
 
   if (appConfig->currentScreenIndex != CONFIG_SCREEN) {
-    Serial.printf("WiFi credentials loaded: SSID='%s', Password length=%d\n", 
-                  appConfig->wifiSSID, strlen(appConfig->wifiPassword));
+    Serial.printf("WiFi credentials loaded: SSID='%s', Password length=%d\n", appConfig->wifiSSID,
+                  strlen(appConfig->wifiPassword));
     WiFiConnection wifi(appConfig->wifiSSID, appConfig->wifiPassword);
     wifi.connect();
     if (!wifi.isConnected()) {
