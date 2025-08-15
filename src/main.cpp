@@ -129,7 +129,7 @@ void initializeDefaultConfig() {
 }
 
 void setup() {
-  delay(10000);
+  delay(1000);
   Serial.begin(115200);
 
   initializeDefaultConfig();

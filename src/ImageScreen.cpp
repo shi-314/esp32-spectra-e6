@@ -16,7 +16,7 @@ ImageScreen::ImageScreen(DisplayType& display, ApplicationConfig& config)
 void ImageScreen::storeImageETag(const String& etag) {
   strncpy(storedImageETag, etag.c_str(), sizeof(storedImageETag) - 1);
   storedImageETag[sizeof(storedImageETag) - 1] = '\0';
-  Serial.println("Stored ETag: " + etag);
+  Serial.println("Stored ETag in RTC memory: " + etag);
 }
 
 String ImageScreen::getStoredImageETag() { return String(storedImageETag); }
@@ -27,6 +27,7 @@ std::unique_ptr<DownloadResult> ImageScreen::download() {
                       "&dither=true&normalize=false&colors=000000,ffffff,e6e600,cc0000,0033cc,00cc00";
 
   String storedETag = getStoredImageETag();
+  Serial.println("Using stored ETag for request: '" + storedETag + "'");
   auto result = downloader.download(requestUrl, storedETag);
 
   if (result->etag.length() > 0) {
