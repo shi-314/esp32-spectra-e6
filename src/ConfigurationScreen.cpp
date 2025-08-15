@@ -2,10 +2,13 @@
 
 #include <memory>
 
+#include "ConfigurationServer.h"
 #include "HardwareSerial.h"
 
 ConfigurationScreen::ConfigurationScreen(DisplayType& display)
-    : display(display), accessPointName("WeatherStation-Config"), accessPointPassword("configure123") {
+    : display(display),
+      accessPointName(ConfigurationServer::WIFI_AP_NAME),
+      accessPointPassword(ConfigurationServer::WIFI_AP_PASSWORD) {
   gfx.begin(display);
 }
 
@@ -64,8 +67,8 @@ void ConfigurationScreen::render() {
   int qrCodeY = (display.height() - qrCodePixelSize) / 2;
 
   gfx.setFontMode(1);
-  gfx.setForegroundColor(GxEPD_BLUE);
-  gfx.setForegroundColor(GxEPD_BLACK);
+  gfx.setBackgroundColor(GxEPD_BLUE);
+  gfx.setForegroundColor(GxEPD_WHITE);
 
   display.setFullWindow();
   display.fillScreen(GxEPD_WHITE);
@@ -73,7 +76,6 @@ void ConfigurationScreen::render() {
   display.fillRect(0, 0, display.width(), 80, GxEPD_BLUE);
 
   gfx.setFont(u8g2_font_open_iconic_embedded_4x_t);
-  gfx.setForegroundColor(GxEPD_WHITE);
   gfx.setCursor(textLeftMargin, 55);
   gfx.print((char)66);
 
@@ -98,7 +100,7 @@ void ConfigurationScreen::render() {
 
   gfx.setFont(u8g2_font_courB14_tr);
   gfx.setCursor(textLeftMargin + 30, currentY);
-  gfx.print("WeatherStation-Config");
+  gfx.print(ConfigurationServer::WIFI_AP_NAME);
   currentY += lineSpacing;
 
   gfx.setFont(u8g2_font_fur17_tr);

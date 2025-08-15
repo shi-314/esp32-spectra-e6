@@ -24,6 +24,9 @@ using OnSaveCallback = std::function<void(const Configuration &config)>;
 
 class ConfigurationServer {
  public:
+  static const char *WIFI_AP_NAME;
+  static const char *WIFI_AP_PASSWORD;
+
   ConfigurationServer(const Configuration &currentConfig);
   void run(OnSaveCallback onSaveCallback);
   void stop();

@@ -151,13 +151,18 @@ void setup() {
   digitalWrite(LED_PIN, LED_ON);
 
   if (appConfig->currentScreenIndex != CONFIG_SCREEN) {
-    Serial.printf("WiFi credentials loaded: SSID='%s', Password length=%d\n", appConfig->wifiSSID,
-                  strlen(appConfig->wifiPassword));
-    WiFiConnection wifi(appConfig->wifiSSID, appConfig->wifiPassword);
-    wifi.connect();
-    if (!wifi.isConnected()) {
-      Serial.println("Failed to connect to WiFi, switching to configuration screen");
+    if (!appConfig->hasValidWiFiCredentials()) {
+      Serial.println("No valid WiFi credentials found, switching to configuration screen");
       appConfig->currentScreenIndex = CONFIG_SCREEN;
+    } else {
+      Serial.printf("WiFi credentials loaded: SSID='%s', Password length=%d\n", appConfig->wifiSSID,
+                    strlen(appConfig->wifiPassword));
+      WiFiConnection wifi(appConfig->wifiSSID, appConfig->wifiPassword);
+      wifi.connect();
+      if (!wifi.isConnected()) {
+        Serial.println("Failed to connect to WiFi, switching to configuration screen");
+        appConfig->currentScreenIndex = CONFIG_SCREEN;
+      }
     }
   }
 
