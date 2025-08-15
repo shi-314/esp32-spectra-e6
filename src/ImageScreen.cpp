@@ -176,10 +176,10 @@ std::unique_ptr<ColorImageBitmaps> ImageScreen::processImageData(uint8_t* data, 
       int bufferIndex = y * imageWidth + x;
       uint8_t colorIndex = pixelBuffer[bufferIndex];
 
-      // Calculate bit position in bitmap - flip X coordinate to fix horizontal mirroring
-      int flippedX = (imageWidth - 1) - x;  // Reverse X coordinate
-      int byteIndex = y * bitmapWidthBytes + flippedX / 8;
-      int bitIndex = 7 - (flippedX % 8);  // MSB first
+      // Calculate bit position in bitmap - flip Y coordinate to match display rotation
+      int flippedY = (imageHeight - 1) - y;  // Reverse Y coordinate to match 180-degree display rotation
+      int byteIndex = flippedY * bitmapWidthBytes + x / 8;
+      int bitIndex = 7 - (x % 8);  // MSB first
       uint8_t bitMask = 1 << bitIndex;
 
       // Set appropriate bit in the corresponding color plane
