@@ -11,7 +11,12 @@ WiFiConnection::WiFiConnection(const char* ssid, const char* password)
 void WiFiConnection::connect() {
   Serial.printf("Connecting to WiFi: %s\n", _ssid);
   
-  // Simple WiFi initialization
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("WiFi already connected, skipping reconnection");
+    connected = true;
+    return;
+  }
+  
   WiFi.mode(WIFI_STA);
   WiFi.begin(_ssid, _password);
   
