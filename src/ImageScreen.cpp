@@ -324,4 +324,4 @@ void ImageScreen::displayBatteryStatus() {
   gfx.print(batteryStatus);
 }
 
-int ImageScreen::nextRefreshInSeconds() { return 300; }
+int ImageScreen::nextRefreshInSeconds() { return 900; }
