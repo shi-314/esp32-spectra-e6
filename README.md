@@ -1,58 +1,67 @@
-# LilyGO T5 Weather Station
+# ESP32 Spectra E6 - E-Paper Image Display
 
-A weather station for LilyGO T5 e-paper displays that shows current weather, forecasts, and AI-generated weather summaries.
+An ESP32 firmware for displaying images on e-paper displays with automatic dithering and color optimization. The device
+fetches images from a configurable URL, processes them through a dithering service for optimal e-paper display, and
+shows them with efficient power management.
 
-![FinishedDevice](https://blog.shvn.dev/posts/2025-lilygo-t5-weather-station/cover_hu_55bb10d7bb0097ef.jpg)
+![FinishedDevice](<!-- placeholder for device image -->)
 
-See also the [blog post](https://blog.shvn.dev/posts/2025-lilygo-t5-weather-station/) I wrote about this.
+See also the [blog post](<!-- placeholder for blog post link -->) for more details about this project.
 
 ## Features
 
-- Current weather display
-- Meteorogram/forecast view
-- AI-powered weather summaries (requires OpenAI API key)
-- Configuration via web interface
+- Image fetching and display from configurable URLs
+- Automatic image dithering and color optimization for e-paper displays
+- Configuration via web interface (captive portal)
 - Deep sleep mode for battery efficiency
+- ETag-based caching to avoid unnecessary downloads
+- Battery level monitoring
 
-## Data Sources
+## Image Processing
 
-- **Weather data**: [Open-Meteo API](https://open-meteo.com/)
-- **AI summaries**: OpenAI API (optional, requires API key)
+- **Image dithering**: Processed through dithering service
+- **Color palette**: Optimized for 6-color e-paper displays (black, white, yellow, red, blue, green)
+- **Resolution**: Automatically scaled to match display dimensions
 
 ## Hardware Required
 
-- One of the following boards:
-    - [LilyGo T5 v2.13 e-paper display board (4 grayscale colors)](https://lilygo.cc/en-pl/products/t5-2-13inch-e-paper?variant=42466420850869)
-    - [LilyGO T5 v2.13 e-paper display board (officially only black and white)](https://lilygo.cc/en-pl/products/t5-v2-3-1?variant=42366871666869)
-- [Case](https://www.thingiverse.com/thing:4670205/files)
-- LiPo battery: 3.7V 500mAh recommended (fits in case, ~1 month battery life)
-- WiFi network for initial configuration and weather data updates
-- Mobile phone to connect to the device and configure it
+- **ESP32 Development Board**: [LilyGO T7-S3](https://lilygo.cc/products/t7-s3) - or any other ESP32 board
+- **E-Paper Display**: Compatible with 6-color e-paper displays such as
+  [E Ink Spectra E6](https://www.waveshare.com/product/displays/e-paper/epaper-1/7.3inch-e-paper-hat-e.htm)
+- **Battery**: 3.7V LiPo battery
+- **WiFi Network**: For initial configuration and image downloads
+- **Mobile Device**: For connecting to configuration interface
 
 ## Setup
 
 1. Install PlatformIO
 2. Clone this repository
 3. **Configure display type** (if using a different display):
-   - Edit `src/DisplayType.h`
-   - Set the appropriate `#define` for your display type:
-     - `#define ARDUINO_LILYGO_T5_V213 1` (default, 2.13" display)
-     - `#define ARDUINO_LILYGO_T5_V213_4G 1` (2.13" 4-grayscale display)
-   - Comment out other display definitions
-4. Build and upload the firmware
-5. Upload the filesystem image (contains web interface files)
+   - Edit `src/DisplayType.h` to match your specific e-paper display
+   - Update pin definitions in `include/boards.h` if needed
+4. Build and upload the firmware:
+   ```bash
+   pio run --target upload
+   ```
+5. Upload the filesystem image (contains web interface files):
+   ```bash
+   pio run --target uploadfs
+   ```
 
 ## Configuration
 
-1. Power on the device (shows configuration screen automatically on first boot)
-2. Connect to the WiFi hotspot created by the device
+1. Power on the device (shows configuration screen with QR code on first boot)
+2. Scan the QR code with your phone to connect to the device's WiFi hotspot
 3. Your web browser will open automatically showing the configuration page
-4. Configure WiFi credentials, location, and optionally OpenAI API key
+4. Configure:
+   - **WiFi credentials**: Your home network SSID and password
+   - **Image URL**: Direct URL to the image you want to display
 
-To re-enter configuration mode later, press the button while the device is running.
+Configuration mode will automatically activate if WiFi connection fails or credentials are invalid.
 
 ## Usage
 
-- **Button press**: Cycle through screens or enter configuration mode.
-- **Screens**: Configuration → Current weather → Meteogram → AI summary (if configured).
-- **Auto-refresh**: Updates every 15 minutes and goes back into deep sleep mode.
+- **Auto-refresh**: Device periodically downloads and displays the configured image, then enters deep sleep
+- **Configuration mode**: Automatically shown when no WiFi credentials are configured or WiFi connection fails
+- **Battery monitoring**: Current battery level is displayed on screen
+- **ETag caching**: Only downloads new images when they've changed (saves bandwidth and battery)
