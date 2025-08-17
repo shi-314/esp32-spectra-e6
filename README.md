@@ -4,9 +4,9 @@ An ESP32 firmware for displaying images on e-paper displays with automatic dithe
 fetches images from a configurable URL, processes them through a dithering service for optimal e-paper display, and
 shows them with efficient power management.
 
-![FinishedDevice](<!-- placeholder for device image -->)
+![FinishedDevice](https://blog.shvn.dev/posts/2025-esp32-spectra-e6/cover_hu_598c6daf125e5264.jpg)
 
-See also the [blog post](<!-- placeholder for blog post link -->) for more details about this project.
+See also the [blog post](https://blog.shvn.dev/posts/2025-esp32-spectra-e6/) for more details about this project.
 
 ## Features
 
