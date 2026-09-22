@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 
+#include "boards.h"
+
 #if __has_include("config_dev.h")
 #include "config_dev.h"
 #else
@@ -15,7 +17,7 @@ struct ApplicationConfig {
   char wifiPassword[64];
   char imageUrl[300];
 
-  static const int DISPLAY_ROTATION = 2;
+  static const int DISPLAY_ROTATION = BOARD_DISPLAY_ROTATION;
 
   ApplicationConfig() {
     memset(wifiSSID, 0, sizeof(wifiSSID));

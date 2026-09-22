@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [ lilygo-t7-s3, reterminal-e1002 ]
     
     steps:
     - name: Checkout code
@@ -41,13 +44,13 @@ jobs:
         pip install --upgrade platformio
         
     - name: Build firmware
-      run: pio run --environment lilygo-t5-v213
+      run: pio run --environment ${{ matrix.environment }}
       
     - name: Build filesystem image
-      run: pio run --target buildfs --environment lilygo-t5-v213
+      run: pio run --target buildfs --environment ${{ matrix.environment }}
       
     - name: Verify build outputs
       run: |
         echo "✅ Build completed successfully!"
-        echo "📦 Firmware binary: $(ls -lh .pio/build/lilygo-t5-v213/firmware.bin)"
-        echo "📦 Filesystem image: $(ls -lh .pio/build/lilygo-t5-v213/spiffs.bin)" 
+        echo "📦 Firmware binary: $(ls -lh .pio/build/${{ matrix.environment }}/firmware.bin)"
+        echo "📦 Filesystem image: $(ls -lh .pio/build/${{ matrix.environment }}/spiffs.bin)" 
