@@ -52,18 +52,22 @@ jobs:
         echo "tag=v$(date +'%Y%m%d')-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         
     - name: Build firmware
-      run: pio run --environment lilygo-t5-v213
+      run: |
+        pio run --environment lilygo-t7-s3
+        pio run --environment reterminal-e1002
       
     - name: Build filesystem image
-      run: pio run --target buildfs --environment lilygo-t5-v213
+      run: |
+        pio run --target buildfs --environment lilygo-t7-s3
+        pio run --target buildfs --environment reterminal-e1002
       
     - name: Prepare artifacts
       run: |
         mkdir -p release-artifacts
-        # Copy firmware binary
-        cp .pio/build/lilygo-t5-v213/firmware.bin release-artifacts/lilygo-t5-firmware-${{ steps.build_info.outputs.short_sha }}.bin
-        # Copy filesystem image
-        cp .pio/build/lilygo-t5-v213/spiffs.bin release-artifacts/filesystem.bin
+        for env in lilygo-t7-s3 reterminal-e1002; do
+          cp .pio/build/$env/firmware.bin release-artifacts/$env-firmware-${{ steps.build_info.outputs.short_sha }}.bin
+          cp .pio/build/$env/spiffs.bin release-artifacts/$env-filesystem.bin
+        done
         
         # Create checksums
         cd release-artifacts
@@ -73,7 +77,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.build_info.outputs.tag }}
-        name: "LilyGO T5 Weather Station - ${{ steps.build_info.outputs.short_sha }}"
+        name: "ESP32 Spectra E6 - ${{ steps.build_info.outputs.short_sha }}"
         body: |
           ## 🚀 Release
           
@@ -82,14 +86,18 @@ jobs:
           
           **Using esptool.py:**
           ```bash
-          esptool.py --port /dev/ttyUSB0 write_flash 0x10000 firmware.bin
-          esptool.py --port /dev/ttyUSB0 write_flash 0x290000 filesystem.bin
+          # LilyGO T7-S3
+          esptool.py --port /dev/ttyUSB0 write_flash 0x10000 lilygo-t7-s3-firmware-*.bin
+          esptool.py --port /dev/ttyUSB0 write_flash 0xc90000 lilygo-t7-s3-filesystem.bin
+          # reTerminal E1002
+          esptool.py --port /dev/ttyUSB0 write_flash 0x10000 reterminal-e1002-firmware-*.bin
+          esptool.py --port /dev/ttyUSB0 write_flash 0x670000 reterminal-e1002-filesystem.bin
           ```
           
           **Using PlatformIO:**
           ```bash
-          pio run --target upload
-          pio run --target uploadfs
+          pio run -e <lilygo-t7-s3|reterminal-e1002> --target upload
+          pio run -e <lilygo-t7-s3|reterminal-e1002> --target uploadfs
           ```
         files: |
           release-artifacts/*

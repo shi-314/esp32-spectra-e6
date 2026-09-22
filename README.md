@@ -25,10 +25,20 @@ See also the [blog post](https://blog.shvn.dev/posts/2025-esp32-spectra-e6/) for
 
 ## Hardware Required
 
+Either an all-in-one device:
+
+- [Seeed Studio reTerminal E1002](https://www.seeedstudio.com/reTerminal-E1002-p-6533.html) (ESP32-S3, 7.3" E Ink
+  Spectra 6 display and battery built in)
+
+Or a DIY build:
+
 - **ESP32 Development Board**: [LilyGO T7-S3](https://lilygo.cc/products/t7-s3) - or any other ESP32 board
 - **E-Paper Display**: Compatible with 6-color e-paper displays such as
   [E Ink Spectra E6](https://www.waveshare.com/product/displays/e-paper/epaper-1/7.3inch-e-paper-hat-e.htm)
 - **Battery**: 3.7V LiPo battery
+
+Plus:
+
 - **WiFi Network**: For initial configuration and image downloads
 - **Mobile Device**: For connecting to configuration interface
 
@@ -36,17 +46,32 @@ See also the [blog post](https://blog.shvn.dev/posts/2025-esp32-spectra-e6/) for
 
 1. Install PlatformIO
 2. Clone this repository
-3. **Configure display type** (if using a different display):
-   - Edit `src/DisplayType.h` to match your specific e-paper display
-   - Update pin definitions in `include/boards.h` if needed
+3. Pick the PlatformIO environment for your board:
+
+   | Board                                  | Environment                  |
+   |----------------------------------------|------------------------------|
+   | LilyGO T7-S3 + Waveshare 7.3" HAT (E)  | `lilygo-t7-s3` (default)     |
+   | Seeed Studio reTerminal E1002          | `reterminal-e1002`           |
+
 4. Build and upload the firmware:
    ```bash
-   pio run --target upload
+   pio run -e <environment> --target upload
    ```
 5. Upload the filesystem image (contains web interface files):
    ```bash
-   pio run --target uploadfs
+   pio run -e <environment> --target uploadfs
    ```
+
+Omitting `-e` builds the default `lilygo-t7-s3` environment.
+
+### Adding a Board
+
+Board-specific settings (display driver, rotation, pins, battery and LED config) live in `include/board_<name>.h`.
+To add a board:
+
+1. Create `include/board_<name>.h` based on an existing one
+2. Add a `BOARD_<NAME>` branch to `include/boards.h`
+3. Add an `[env:<name>]` section to `platformio.ini` that sets `-DBOARD_<NAME>` in `build_flags`
 
 ## Configuration
 

@@ -22,6 +22,12 @@ ApplicationConfigStorage configStorage;
 // Standard constructor for GxEPD2
 DisplayType display(Epd2Type(EPD_CS, EPD_DC, EPD_RSET, EPD_BUSY));
 
+#ifdef EPD_SPI_HOST
+SPIClass epdSpi(EPD_SPI_HOST);
+#else
+SPIClass& epdSpi = SPI;
+#endif
+
 void goToSleep(uint64_t sleepTimeInSeconds);
 int displayCurrentScreen(bool wifiConnected);
 bool isButtonWakeup();
@@ -136,7 +142,17 @@ void setup() {
 
   pinMode(BATTERY_PIN, INPUT);
 
-  SPI.begin(EPD_SCLK, EPD_MISO, EPD_MOSI, EPD_CS);
+#ifdef SD_POWER_PIN
+  pinMode(SD_CS_PIN, OUTPUT);
+  digitalWrite(SD_CS_PIN, HIGH);
+  pinMode(SD_POWER_PIN, OUTPUT);
+  digitalWrite(SD_POWER_PIN, HIGH);
+#endif
+
+  epdSpi.begin(EPD_SCLK, EPD_MISO, EPD_MOSI, EPD_CS);
+#ifdef EPD_SPI_FREQUENCY
+  display.epd2.selectSPI(epdSpi, SPISettings(EPD_SPI_FREQUENCY, MSBFIRST, SPI_MODE0));
+#endif
 
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LED_ON);

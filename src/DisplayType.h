@@ -3,10 +3,21 @@
 
 #include <GxEPD2_7C.h>
 
-// Define here which display type to use - using 7.3" color e-paper
+#include "boards.h"
 
-// Display instance for 7.3" color e-paper - using reduced buffer
-using DisplayType = GxEPD2_7C<GxEPD2_730c_GDEP073E01, GxEPD2_730c_GDEP073E01::HEIGHT>;
-using Epd2Type = GxEPD2_730c_GDEP073E01;
+// Display driver is selected by the board configuration (see include/boards.h)
+#ifdef EPD_BUSY_TIMEOUT_US
+// GxEPD2 hardcodes the busy timeout per driver; boards with slower refreshes override it here
+class Epd2Type : public EPD_DRIVER {
+ public:
+  Epd2Type(int16_t cs, int16_t dc, int16_t rst, int16_t busy) : EPD_DRIVER(cs, dc, rst, busy) {
+    _busy_timeout = EPD_BUSY_TIMEOUT_US;
+  }
+};
+#else
+using Epd2Type = EPD_DRIVER;
+#endif
+
+using DisplayType = GxEPD2_7C<Epd2Type, Epd2Type::HEIGHT>;
 
 #endif

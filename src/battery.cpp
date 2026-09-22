@@ -1,7 +1,15 @@
 #include "battery.h"
 
 String getBatteryStatus() {
+#ifdef BATTERY_ENABLE_PIN
+  pinMode(BATTERY_ENABLE_PIN, OUTPUT);
+  digitalWrite(BATTERY_ENABLE_PIN, HIGH);
+  delay(10);
+#endif
   int rawValue = analogRead(BATTERY_PIN);
+#ifdef BATTERY_ENABLE_PIN
+  digitalWrite(BATTERY_ENABLE_PIN, LOW);
+#endif
   // Convert to voltage (ESP32 ADC is 12-bit, 0-3.3V)
   float voltage = (rawValue * 3.3) / 4095.0;
   // Adjust for voltage divider
