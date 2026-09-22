@@ -29,6 +29,9 @@
 #define SD_POWER_PIN 16
 #define SD_CS_PIN 14
 
+// Green refresh button (KEY1, active low with external pull-up) wakes the device from deep sleep
+#define WAKE_BUTTON_PIN 4
+
 // Battery monitoring: the divider is only powered while the enable pin is high
 #define BATTERY_PIN 1
 #define BATTERY_ENABLE_PIN 21

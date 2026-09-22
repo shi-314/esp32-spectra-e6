@@ -113,11 +113,12 @@ void updateConfiguration(const Configuration& config) {
 
 void goToSleep(uint64_t sleepTimeInSeconds) {
   Serial.println("Going to deep sleep for " + String(sleepTimeInSeconds) + " seconds");
-  Serial.println("Timer-only wakeup (button wakeup disabled for testing)");
 
   uint64_t sleepTimeMicros = sleepTimeInSeconds * 1000000ULL;
-  // Temporarily disable button wakeup to test if it's causing premature wakeups
   esp_sleep_enable_timer_wakeup(sleepTimeMicros);
+#ifdef WAKE_BUTTON_PIN
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)WAKE_BUTTON_PIN, 0);
+#endif
   esp_deep_sleep_start();
 }
 
@@ -139,6 +140,12 @@ void setup() {
   Serial.begin(115200);
 
   initializeDefaultConfig();
+
+  if (isButtonWakeup()) {
+    // Treat a button press like a restart: re-download and redraw even if the image is unchanged
+    Serial.println("Woken by button, forcing image refresh");
+    ImageScreen::clearStoredImageETag();
+  }
 
   pinMode(BATTERY_PIN, INPUT);
 

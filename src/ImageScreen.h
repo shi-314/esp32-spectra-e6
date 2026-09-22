@@ -59,6 +59,7 @@ class ImageScreen : public Screen {
 
  public:
   ImageScreen(DisplayType& display, ApplicationConfig& config);
+  static void clearStoredImageETag();
   void render() override;
   int nextRefreshInSeconds() override;
 };
