@@ -21,6 +21,8 @@ void ImageScreen::storeImageETag(const String& etag) {
 
 String ImageScreen::getStoredImageETag() { return String(storedImageETag); }
 
+void ImageScreen::clearStoredImageETag() { storedImageETag[0] = '\0'; }
+
 std::unique_ptr<DownloadResult> ImageScreen::download() {
   String requestUrl = ditheringServiceUrl + "/process?url=" + downloader.urlEncode(String(config.imageUrl)) +
                       "&width=" + String(display.width()) + "&height=" + String(display.height()) +
