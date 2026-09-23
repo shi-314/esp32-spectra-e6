@@ -33,8 +33,8 @@ const int HEADER_RULE_Y = 68;
 const int LEFT_GUTTER = 40;
 const int RIGHT_GUTTER = 32;
 
-const int CLOUD_ROW_HEIGHT = 10;
-const int SUN_STRIP_HEIGHT = 20;
+const int CLOUD_ROW_HEIGHT = 12;
+const int CLOUD_GAP = 2 * UNIT;
 const int TIME_AXIS_HEIGHT = 20;
 
 // Tints, as the fraction of pixels inked by the ordered dither
@@ -397,25 +397,26 @@ void MeteogramScreen::drawMeteogram(int x, int y, int w, int h) {
   placedLabels.clear();
 
   int cloudTop = y;
-  int sunStripTop = cloudTop + CLOUD_ROW_HEIGHT;
-  int chartTop = sunStripTop + SUN_STRIP_HEIGHT;
+  int chartTop = cloudTop + CLOUD_ROW_HEIGHT + CLOUD_GAP;
   int chartBottom = y + h - TIME_AXIS_HEIGHT;
 
   drawNightShading(chartTop, chartBottom - chartTop);
   drawTimeAxis(chartTop, y + h, chartBottom);
   drawCloudCover(cloudTop);
+  // Sun markers claim their spots before the chart labels are placed, and are drawn over everything last
+  drawSunMarkers(chartTop, false);
   drawChart(chartTop, chartBottom - chartTop);
 
-  // Now: a hairline through every row, with a marker above the cloud layers
+  // Now: a hairline through the cloud bar and chart, with a marker above the cloud bar
   int nowX = timeToX(isoToMinutes(f.currentTime));
   if (nowX >= plotX && nowX <= plotX + plotW) {
     for (int py = cloudTop; py <= chartBottom; py++) {
-      if (py < sunStripTop || py >= chartTop) display.drawPixel(nowX, py, INK);
+      if (py <= cloudTop + CLOUD_ROW_HEIGHT || py >= chartTop) display.drawPixel(nowX, py, INK);
     }
     display.fillTriangle(nowX - 5, cloudTop - 7, nowX + 5, cloudTop - 7, nowX, cloudTop - 1, INK);
   }
 
-  drawSunMarkers(sunStripTop + SUN_STRIP_HEIGHT / 2);
+  drawSunMarkers(chartTop, true);
 }
 
 void MeteogramScreen::drawNightShading(int top, int height) {
@@ -441,36 +442,64 @@ void MeteogramScreen::drawCloudCover(int top) {
     int right = min((int)round(indexToX(i + 0.5f)), plotX + plotW);
     fillDithered(left, top, right - left, CLOUD_ROW_HEIGHT, INK, forecast.hourlyCloudCover[i] / 100.0f * CLOUD_FULL_TINT);
   }
-  drawDottedHLine(plotX, top + CLOUD_ROW_HEIGHT, plotW, 2, INK);
-
-  gfx.setFont(captionFont);
-  int ascent = gfx.getFontAscent();
-  String name = "Cloud";
-  drawText(name, plotX - UNIT / 2 - textWidth(name, captionFont), top + (CLOUD_ROW_HEIGHT + ascent) / 2, captionFont,
-           INK);
+  // The outline keeps clear stretches reading as part of the bar instead of gaps in the layout
+  display.drawRect(plotX, top, plotW + 1, CLOUD_ROW_HEIGHT + 1, INK);
+  drawCloudIcon(plotX - UNIT / 2, top + CLOUD_ROW_HEIGHT / 2);
 }
 
-void MeteogramScreen::drawSunMarkers(int centerY) {
+// Open Iconic cloud (glyph 64 of the weather font), knocked back to a checkerboard so it reads as
+// grey like the cloud bar instead of a solid black blob
+void MeteogramScreen::drawCloudIcon(int right, int centerY) {
+  const char cloudGlyph = 64;
+
+  gfx.setFont(u8g2_font_open_iconic_weather_2x_t);
+  gfx.setFontMode(1);
+  gfx.setForegroundColor(INK);
+
+  int iconWidth = gfx.getUTF8Width(String(cloudGlyph).c_str());
+  int iconHeight = gfx.getFontAscent();
+  int x = right - iconWidth;
+  int baseline = centerY + iconHeight / 2;
+
+  gfx.setCursor(x, baseline);
+  gfx.print(cloudGlyph);
+
+  for (int py = baseline - iconHeight; py <= baseline; py++) {
+    for (int px = x; px < x + iconWidth; px++) {
+      if ((px + py) % 2 != 0) display.drawPixel(px, py, PAPER);
+    }
+  }
+}
+
+// Sunrise and sunset sit at the top of the chart where the night shading starts or ends, with the
+// time on the daylight side of the boundary. The first pass only reserves their space.
+void MeteogramScreen::drawSunMarkers(int top, bool draw) {
   gfx.setFont(labelFont);
   int ascent = gfx.getFontAscent();
   long windowEnd = windowStart + (pointCount - 1) * 60L;
+  const int iconWidth = 20;
 
   for (int kind = 0; kind < 2; kind++) {
-    const std::vector<String> &events = kind == 0 ? forecast.sunrises : forecast.sunsets;
+    bool rising = kind == 0;
+    const std::vector<String> &events = rising ? forecast.sunrises : forecast.sunsets;
     for (const String &event : events) {
       long minutes = isoToMinutes(event);
       if (minutes < windowStart || minutes > windowEnd) continue;
 
       int x = timeToX(minutes);
       String time = clockTime(event);
-      int labelWidth = textWidth(time, labelFont);
+      int width = iconWidth + textWidth(time, labelFont);
+      int left = constrain(rising ? x + 3 : x - 3 - width, plotX + 2, plotX + plotW - width - 2);
+      int baseline = top + 4 + ascent;
+      Box box = {left - 2, top + 1, left + width + 2, baseline + 3};
 
-      // Tick down to the panel, icon and time beside it, flipped to the left near the right edge
-      drawDottedVLine(x, centerY + 4, SUN_STRIP_HEIGHT / 2 - 4, 2, INK);
-      drawSunIcon(x, centerY - 1, 4, kind == 0);
-      bool flip = x + 13 + labelWidth > plotX + plotW;
-      int labelX = flip ? x - 8 - labelWidth : x + 14;
-      drawText(time, labelX, centerY - 1 + ascent / 2, labelFont, INK);
+      if (!draw) {
+        placedLabels.push_back(box);
+        continue;
+      }
+      display.fillRect(box.left, box.top, box.right - box.left, box.bottom - box.top, PAPER);
+      drawSunIcon(left + 5, baseline - ascent / 2, 4, rising);
+      drawText(time, left + iconWidth, baseline, labelFont, INK);
     }
   }
 }
@@ -641,7 +670,7 @@ void MeteogramScreen::drawChart(int top, int height) {
   display.drawFastHLine(plotX, top + height, plotW + 1, INK);
   drawSeries(forecast.hourlyTemperatures, temperature, top, height, 3, TEMPERATURE_COLOR, FREEZING_COLOR, false);
 
-  // Units sit above their scales, in the row the sun markers leave free at either end
+  // The wind unit sits above its scale, level with the gap under the cloud bar
   drawText("m/s", plotX + plotW + UNIT / 2, top - UNIT / 2, labelFont, WIND_COLOR);
 }
 

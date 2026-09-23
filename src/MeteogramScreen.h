@@ -76,7 +76,9 @@ class MeteogramScreen : public Screen {
   void drawMeteogram(int x, int y, int w, int h);
   void drawNightShading(int top, int height);
   void drawCloudCover(int top);
-  void drawSunMarkers(int centerY);
+  void drawCloudIcon(int right, int centerY);
+  // With draw false, only reserves the markers' space so chart labels avoid it
+  void drawSunMarkers(int top, bool draw);
   Axis temperatureAxis();
   // Wind scale with a fixed number of intervals, so it can share the temperature gridlines
   Axis windAxis(int intervals);
