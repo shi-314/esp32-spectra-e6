@@ -141,11 +141,30 @@ String OpenMeteoAPI::getWeatherDescription(int weatherCode) const {
   }
 }
 
+namespace {
+// Percent-encodes everything but unreserved characters, so names like Würzburg survive the query string
+String urlEncode(const String& text) {
+  const char* hex = "0123456789ABCDEF";
+  String encoded;
+  for (unsigned i = 0; i < text.length(); i++) {
+    uint8_t c = text.charAt(i);
+    if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+      encoded += (char)c;
+    } else {
+      encoded += '%';
+      encoded += hex[c >> 4];
+      encoded += hex[c & 0x0F];
+    }
+  }
+  return encoded;
+}
+}  // namespace
+
 GeocodingResult OpenMeteoAPI::getLocationByCity(const String& cityName, const String& countryCode) const {
   GeocodingResult result;
 
   HTTPClient http;
-  String url = String(geocodingEndpoint) + "?name=" + cityName + "&count=1&language=en&format=json";
+  String url = String(geocodingEndpoint) + "?name=" + urlEncode(cityName) + "&count=1&language=en&format=json";
 
   if (countryCode.length() > 0) {
     url += "&countryCode=" + countryCode;

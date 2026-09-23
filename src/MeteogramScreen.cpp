@@ -94,6 +94,26 @@ long isoToMinutes(const String &iso) {
   return days * 1440L + iso.substring(11, 13).toInt() * 60 + iso.substring(14, 16).toInt();
 }
 
+// Uppercases ASCII and the Latin-1 letters the fonts carry (ä, ö, ü, é, ...), which String::toUpperCase
+// leaves alone since they are two bytes in UTF-8
+String upperCase(const String &text) {
+  String result;
+  for (unsigned i = 0; i < text.length(); i++) {
+    uint8_t c = text.charAt(i);
+    if (c == 0xC3 && i + 1 < text.length()) {
+      uint8_t next = text.charAt(i + 1);
+      // U+00E0-U+00FE map to U+00C0-U+00DE, except the division sign U+00F7
+      if (next >= 0xA0 && next <= 0xBE && next != 0xB7) next -= 0x20;
+      result += (char)c;
+      result += (char)next;
+      i++;
+    } else {
+      result += (char)toupper(c);
+    }
+  }
+  return result;
+}
+
 String clockTime(const String &iso) { return iso.length() >= 16 ? iso.substring(11, 16) : String(""); }
 
 String formatDuration(long minutes) {
@@ -318,8 +338,7 @@ void MeteogramScreen::drawHeader(int x, int y, int w) {
 
 // Returns its right edge, so the sun times can be centred in the space that is left
 int MeteogramScreen::drawNowColumn(int x, int top) {
-  String location = locationName;
-  location.toUpperCase();
+  String location = upperCase(locationName);
   String temperature = formatDegrees(forecast.currentTemperature, 1);
   String feels = "Feels like " + formatDegrees(forecast.currentApparentTemperature, 0);
 
@@ -367,8 +386,7 @@ void MeteogramScreen::drawSunTimes(int left, int right, int top) {
 
 // Returns its left edge, so the indoor readings can be placed against it
 int MeteogramScreen::drawStatusColumn(int right, int top) {
-  String date = forecast.lastUpdateDate;
-  date.toUpperCase();
+  String date = upperCase(forecast.lastUpdateDate);
   String updated = forecast.lastUpdateTime;
 
   drawText(date, right - textWidth(date, captionFont), top + CAPTION_BASELINE, captionFont, INK);
