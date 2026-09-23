@@ -67,8 +67,8 @@ class MeteogramScreen : public Screen {
   bool placeLabel(const String& text, int centerX, int baseline, const uint8_t* font, uint16_t color);
 
   void drawHeader(int x, int y, int w);
-  int drawNowColumn(int x, int top);
-  void drawSunTimes(int left, int right, int top);
+  int drawNowColumn(int x, int top, bool draw);
+  int drawSunTimes(int x, int top);
   // Returns its left edge, so neighbouring content can be placed against it
   int drawStatusColumn(int right, int top);
   int drawBatteryIndicator(int right, int baseline);
