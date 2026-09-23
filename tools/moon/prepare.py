@@ -32,11 +32,18 @@ SIZE = 448  # Bitmap edge, a multiple of 8 so rows pack into whole bytes
 FRAME_CENTER = (364.5, 365.0)
 PIXELS_PER_ARCSEC = 656 / 1873.7
 
-# Tone curve before dithering: levels at or below BLACK stay black, so the faint earthshine on the
-# unlit side becomes a sparse ghost of the disc rather than noise, and GAMMA lifts the grey maria
+# Tone curve for the sunlit side: levels at or below BLACK are left to the earthshine pass, and GAMMA
+# lifts the grey maria
 BLACK = 8
 WHITE = 235
 GAMMA = 0.85
+
+# The unlit side is faintly lit by earthshine (levels up to about 25 in NASA's frames). It is kept
+# very dark rather than black: at most EARTHSHINE of its pixels are lit, scattered at random, since
+# error diffusion either drops tones this faint or lines them up into streaks
+EARTHSHINE = 0.10
+EARTHSHINE_LEVEL = 25
+EARTHSHINE_LIMIT = BLACK + 12  # Brighter than this is the sunlit side
 
 HERE = Path(__file__).parent
 CACHE = HERE / "cache"
@@ -94,6 +101,13 @@ def atkinson(gray):
     return out
 
 
+def earthshine(gray, rng):
+    """Sparse random dots on the unlit side, denser where the earthshine is brighter."""
+    density = EARTHSHINE * np.clip((gray.astype(np.float32) - 1) / (EARTHSHINE_LEVEL - 1), 0, 1)
+    density[gray >= EARTHSHINE_LIMIT] = 0
+    return rng.random(gray.shape) < density
+
+
 def tone(gray):
     values = np.clip((gray.astype(np.float32) - BLACK) / (WHITE - BLACK), 0, 1) ** GAMMA
     return (values * 255).astype(np.uint8)
@@ -104,13 +118,15 @@ def main():
     IMAGES.mkdir(exist_ok=True)
     (OUT / "preview").mkdir(parents=True, exist_ok=True)
 
+    rng = np.random.default_rng(5587)  # Seeded, so the output is the same on every run
     info = json.loads(fetch(MOONINFO, CACHE / "mooninfo_2026.json").read_text())
     sheet = Image.new("L", (10 * SIZE // 4, 6 * SIZE // 4))
 
     for k, (frame_number, entry) in enumerate(pick_frames(info)):
         name = f"moon.{frame_number:04d}.jpg"
         frame = Image.open(fetch(f"{FRAMES}/{name}", CACHE / name))
-        lit = atkinson(tone(np.asarray(normalize(frame, entry["diameter"]))))
+        gray = np.asarray(normalize(frame, entry["diameter"]))
+        lit = atkinson(tone(gray)) | earthshine(gray, rng)
 
         # Nothing may be lit outside the disc, whatever the dithering spilled
         yy, xx = np.mgrid[0:SIZE, 0:SIZE]
