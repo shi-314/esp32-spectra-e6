@@ -17,13 +17,16 @@ struct GeocodingResult {
 struct WeatherForecast {
   String lastUpdateTime;
   String lastUpdateDate;
-  String sunrise;  // HH:MM, empty when unavailable
-  String sunset;   // HH:MM, empty when unavailable
+  String currentTime;  // Local ISO timestamp (YYYY-MM-DDTHH:MM) of the current conditions
+
+  // Local ISO timestamps for today and tomorrow, so the chart can shade every night it spans
+  std::vector<String> sunrises;
+  std::vector<String> sunsets;
 
   float currentTemperature;
+  float currentApparentTemperature;
   float currentWindSpeed;
   float currentWindGusts;
-  int currentWindDirection;
   String currentWeatherDescription;
   int currentWeatherCode;
   String currentWeatherCodeDescription;
@@ -31,9 +34,11 @@ struct WeatherForecast {
   std::vector<float> hourlyTemperatures;
   std::vector<float> hourlyWindSpeeds;
   std::vector<float> hourlyWindGusts;
-  std::vector<String> hourlyTime;
+  std::vector<String> hourlyTime;  // Local ISO timestamps
   std::vector<float> hourlyPrecipitation;
-  std::vector<float> hourlyCloudCoverage;
+  std::vector<float> hourlyCloudLow;
+  std::vector<float> hourlyCloudMid;
+  std::vector<float> hourlyCloudHigh;
 
   String apiPayload;
 };
@@ -43,6 +48,7 @@ class OpenMeteoAPI {
   OpenMeteoAPI();
 
   WeatherForecast getForecast(float latitude, float longitude) const;
+  WeatherForecast parseForecast(const String& payload) const;
   GeocodingResult getLocationByCity(const String& cityName, const String& countryCode = "") const;
 
  private:

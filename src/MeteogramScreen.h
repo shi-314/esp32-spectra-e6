@@ -12,41 +12,79 @@
 
 class MeteogramScreen : public Screen {
  private:
+  struct Axis {
+    float min;
+    float max;
+    float step;
+  };
+
+  struct Box {
+    int left, top, right, bottom;
+  };
+
   DisplayType& display;
   U8G2_FOR_ADAFRUIT_GFX gfx;
   WeatherForecast forecast;
   String locationName;
 
-  const uint8_t* titleFont;
-  const uint8_t* primaryFont;
-  const uint8_t* secondaryFont;
+  const uint8_t* heroFont;
+  const uint8_t* valueFont;
+  const uint8_t* detailFont;
   const uint8_t* labelFont;
+  const uint8_t* captionFont;
 
-  int parseHHMMtoMinutes(const String& hhmm);
+  // Horizontal time scale shared by every row of the chart
+  int pointCount = 0;
+  int plotX = 0, plotW = 0;
+  float xStep = 0;
+  long windowStart = 0;
 
-  // The panel has no grey, so tints are dithered from the six available colors
-  void fillDitheredRect(int x, int y, int w, int h, uint16_t color, int density);
-  // Series drawing clips to this rectangle so strokes never bleed over the plot border
-  int clipLeft = 0, clipTop = 0, clipRight = 0, clipBottom = 0;
-  bool withinClip(int x, int y) const;
+  // Series drawing clips to this rectangle so strokes never bleed over the panel edge
+  Box clip = {0, 0, 0, 0};
+  // Annotations already placed, so later ones can step aside instead of overprinting
+  std::vector<Box> placedLabels;
+
+  int timeToX(long minutes) const;
+  float indexToX(float index) const { return plotX + index * xStep; }
+  static float valueToY(float value, const Axis& axis, int top, int height);
+  float sampleSeries(const std::vector<float>& values, float position) const;
+
+  // The panel has six inks and no grey, so tints are ordered-dithered from them
+  void fillDithered(int x, int y, int w, int h, uint16_t color, float fraction);
   void stampDisc(int x, int y, int radius, uint16_t color);
-  void stampHalo(int x, int y, int radius, uint16_t color);
-  // Draws a series as a smoothed, evenly thick curve; dashed and halo are optional styling
-  void drawSeries(const std::vector<float>& values, int count, float minValue, float maxValue, int plotX, int plotY,
-                  int plotW, int plotH, int thickness, uint16_t color, bool dashed, bool halo);
-  void drawDottedLine(int x0, int y0, int x1, int y1, int thickness, uint16_t color);
-  void drawDottedHLine(int x, int y, int w, uint16_t color);
+  // Smoothed, evenly thick curve with a paper-colored halo that keeps it legible over bars and shading.
+  // Stretches below zero switch to belowZeroColor.
+  void drawSeries(const std::vector<float>& values, const Axis& axis, int top, int height, int thickness,
+                  uint16_t color, uint16_t belowZeroColor, bool dashed);
+  void fillBetweenSeries(const std::vector<float>& lower, const std::vector<float>& upper, const Axis& axis, int top,
+                         int height, uint16_t color, float fraction);
+  void drawDottedHLine(int x, int y, int w, int spacing, uint16_t color);
+  void drawDottedVLine(int x, int y, int h, int spacing, uint16_t color);
 
   void drawText(const String& text, int x, int y, const uint8_t* font, uint16_t color);
   int textWidth(const String& text, const uint8_t* font);
+  // Draws a label on a paper background unless it would collide with one already placed
+  bool placeLabel(const String& text, int centerX, int baseline, const uint8_t* font, uint16_t color);
 
   void drawHeader(int x, int y, int w);
-  // Returns the left edge it occupied, so neighbouring content can be placed against it
+  int drawNowColumn(int x, int top, bool draw);
+  int drawWindColumn(int x, int top, bool draw);
+  int drawRainColumn(int x, int top, bool draw);
+  int drawSunColumn(int x, int top, bool draw);
+  int drawIndoorColumn(int x, int top, bool draw);
+  int drawStatusColumn(int right, int top, bool draw);
+  void drawCaptionedValue(int x, int top, const String& caption, const String& value, const String& unit,
+                          const String& detail, bool draw, int* width);
   int drawBatteryIndicator(int right, int baseline);
-  void drawThermometerIcon(int x, int top, uint16_t color);
-  void drawIndoorReadings(int centerX, int baseline);
-  void drawCloudIcon(int right, int centerY);
+  void drawSunIcon(int centerX, int centerY, int radius, bool rising);
+
   void drawMeteogram(int x, int y, int w, int h);
+  void drawNightShading(int top, int height);
+  void drawCloudLayers(int top);
+  void drawSunMarkers(int centerY);
+  void drawTemperaturePanel(int top, int height);
+  void drawWindPanel(int top, int height);
+  void drawTimeAxis(int chartTop, int baseline, int gridBottom);
   void drawMessage(const String& message);
 
  public:

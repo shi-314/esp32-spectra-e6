@@ -90,3 +90,8 @@ Configuration mode will automatically activate if WiFi connection fails or crede
 - **Configuration mode**: Automatically shown when no WiFi credentials are configured or WiFi connection fails
 - **Battery monitoring**: Current battery level is displayed on screen
 - **ETag caching**: Only downloads new images when they've changed (saves bandwidth and battery)
+
+## Development
+
+To work on the meteogram screen without flashing, render it on your computer with the preview tool.
+See [tools/preview/README.md](tools/preview/README.md).
