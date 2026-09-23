@@ -6,14 +6,13 @@
 #include "IndoorSensor.h"
 #include "battery.h"
 
-// Each quantity owns one ink, so the axes and header need no legend: red temperature, blue water,
-// yellow only for the sun. The panel's green is too faint for strokes, so wind is drawn in black and
-// green only tints the gust band. Black also carries text and structure.
+// Each quantity owns one ink, so the chart needs no legend: red temperature, blue water, green wind,
+// yellow only for the sun. The panel's green is faint, which keeps wind in the background behind
+// temperature. Black carries text and structure.
 #define TEMPERATURE_COLOR GxEPD_RED
 #define FREEZING_COLOR GxEPD_BLUE
 #define PRECIPITATION_COLOR GxEPD_BLUE
-#define WIND_COLOR GxEPD_BLACK
-#define GUST_BAND_COLOR GxEPD_GREEN
+#define WIND_COLOR GxEPD_GREEN
 #define SUN_COLOR GxEPD_YELLOW
 #define INK GxEPD_BLACK
 #define PAPER GxEPD_WHITE
@@ -34,20 +33,16 @@ const int HEADER_RULE_Y = 68;
 const int LEFT_GUTTER = 40;
 const int RIGHT_GUTTER = 32;
 
-const int CLOUD_ROW_HEIGHT = 8;
-const int CLOUD_ROW_GAP = 3;
-const int CLOUD_ROWS = 3;
+const int CLOUD_ROW_HEIGHT = 10;
 const int SUN_STRIP_HEIGHT = 20;
-const int PANEL_GAP = 3 * UNIT;
 const int TIME_AXIS_HEIGHT = 20;
-const float TEMPERATURE_PANEL_SHARE = 0.56f;
 
 // Tints, as the fraction of pixels inked by the ordered dither
 const float NIGHT_TINT = 0.125f;
 const float CLOUD_FULL_TINT = 0.75f;
-const float GUST_TINT = 0.5f;
+const float GUST_TINT = 0.25f;
 
-// Precipitation at or above this counts as wet for the rain summary and bar labels
+// Precipitation at or above this always gets a visible bar, however small the scale makes it
 const float WET_HOUR_MM = 0.1f;
 
 // Rain is auto scaled to a rounded full scale with a floor, so a trace of drizzle stays visually small
@@ -99,12 +94,6 @@ long isoToMinutes(const String &iso) {
 }
 
 String clockTime(const String &iso) { return iso.length() >= 16 ? iso.substring(11, 16) : String(""); }
-
-String formatDuration(long minutes) {
-  String mm = String(minutes % 60);
-  if (mm.length() < 2) mm = "0" + mm;
-  return String(minutes / 60) + "h " + mm + "m";
-}
 
 // Temperatures round to whole degrees on the axis but keep a decimal in the header
 String formatDegrees(float value, int decimals) {
@@ -295,163 +284,52 @@ void MeteogramScreen::render() {
 // Header: current conditions on the left, the day's key numbers in captioned columns, status on the right
 
 void MeteogramScreen::drawHeader(int x, int y, int w) {
-  // Measure first so the middle columns can share the remaining width evenly
-  int nowWidth = drawNowColumn(x, y, false);
-  int statusWidth = drawStatusColumn(x + w, y, false);
-  int columnWidths[] = {drawWindColumn(0, y, false), drawRainColumn(0, y, false), drawSunColumn(0, y, false),
-                        drawIndoorColumn(0, y, false)};
+  drawNowColumn(x, y);
+  int statusLeft = drawStatusColumn(x + w, y);
 
-  int columnCount = 0;
-  int columnsTotal = 0;
-  for (int width : columnWidths) {
-    if (width > 0) {
-      columnCount++;
-      columnsTotal += width;
-    }
+  // Indoor readings sit beside the status on the right, apart from the outdoor conditions on the left
+  IndoorReading indoor = readIndoorSensor();
+  if (indoor.valid) {
+    String caption = "INDOOR";
+    String temperature = formatDegrees(indoor.temperature, 1);
+    String humidity = String(indoor.humidity, 0) + "% RH";
+    int width = max(max(textWidth(caption, captionFont), textWidth(temperature, valueFont)), textWidth(humidity, detailFont));
+    int dividerX = statusLeft - 2 * UNIT;
+    int indoorX = dividerX - 2 * UNIT - width;
+
+    drawDottedVLine(dividerX, y + 2, DETAIL_BASELINE, 2, INK);
+    drawText(caption, indoorX, y + CAPTION_BASELINE, captionFont, INK);
+    drawText(temperature, indoorX, y + VALUE_BASELINE, valueFont, INK);
+    drawText(humidity, indoorX, y + DETAIL_BASELINE, detailFont, INK);
   }
-
-  int gap = (w - nowWidth - statusWidth - columnsTotal) / (columnCount + 1);
-  drawNowColumn(x, y, true);
-  drawStatusColumn(x + w, y, true);
-
-  int cursor = x + nowWidth + gap;
-  int (MeteogramScreen::*columns[])(int, int, bool) = {&MeteogramScreen::drawWindColumn,
-                                                       &MeteogramScreen::drawRainColumn,
-                                                       &MeteogramScreen::drawSunColumn,
-                                                       &MeteogramScreen::drawIndoorColumn};
-  for (int i = 0; i < 4; i++) {
-    if (columnWidths[i] == 0) continue;
-    // Faint divider centred in the gap before each column
-    drawDottedVLine(cursor - gap / 2, y + 2, DETAIL_BASELINE, 2, INK);
-    (this->*columns[i])(cursor, y, true);
-    cursor += columnWidths[i] + gap;
-  }
-  drawDottedVLine(cursor - gap / 2, y + 2, DETAIL_BASELINE, 2, INK);
 
   display.drawFastHLine(x, y + HEADER_RULE_Y, w, INK);
 }
 
-void MeteogramScreen::drawCaptionedValue(int x, int top, const String &caption, const String &value,
-                                         const String &unit, const String &detail, bool draw, int *width) {
-  int valueWidth = textWidth(value, valueFont);
-  int unitWidth = unit.length() > 0 ? textWidth(unit, labelFont) + 3 : 0;
-  *width = max(max(textWidth(caption, captionFont), valueWidth + unitWidth), textWidth(detail, detailFont));
-  if (!draw) return;
-
-  drawText(caption, x, top + CAPTION_BASELINE, captionFont, INK);
-  drawText(value, x, top + VALUE_BASELINE, valueFont, INK);
-  if (unitWidth > 0) drawText(unit, x + valueWidth + 3, top + VALUE_BASELINE, labelFont, INK);
-  drawText(detail, x, top + DETAIL_BASELINE, detailFont, INK);
-}
-
-int MeteogramScreen::drawNowColumn(int x, int top, bool draw) {
+void MeteogramScreen::drawNowColumn(int x, int top) {
   String location = locationName;
   location.toUpperCase();
   String temperature = formatDegrees(forecast.currentTemperature, 1);
   String feels = "Feels like " + formatDegrees(forecast.currentApparentTemperature, 0);
 
-  int heroWidth = textWidth(temperature, heroFont);
-  int textX = x + heroWidth + 2 * UNIT;
-  int width = max(textWidth(location, captionFont),
-                  heroWidth + 2 * UNIT +
-                      max(textWidth(forecast.currentWeatherDescription, detailFont), textWidth(feels, detailFont)));
-  if (!draw) return width;
+  int textX = x + textWidth(temperature, heroFont) + 2 * UNIT;
 
   drawText(location, x, top + CAPTION_BASELINE, captionFont, INK);
   drawText(temperature, x, top + DETAIL_BASELINE, heroFont, INK);
   drawText(forecast.currentWeatherDescription, textX, top + VALUE_BASELINE, detailFont, INK);
   drawText(feels, textX, top + DETAIL_BASELINE, detailFont, INK);
-  return width;
 }
 
-int MeteogramScreen::drawWindColumn(int x, int top, bool draw) {
-  int width;
-  drawCaptionedValue(x, top, "WIND", String(forecast.currentWindSpeed, 1), "m/s",
-                     "Gusts " + String(forecast.currentWindGusts, 1), draw, &width);
-  return width;
-}
-
-int MeteogramScreen::drawRainColumn(int x, int top, bool draw) {
-  int count = forecast.hourlyPrecipitation.size();
-  if (count < 2 || forecast.hourlyTime.size() < (size_t)count) return 0;
-
-  // Each hourly amount is the sum over the hour before its timestamp, so the hour now in progress
-  // is the first one whose timestamp lies ahead
-  long now = isoToMinutes(forecast.currentTime);
-  int current = count - 1;
-  for (int i = 0; i < count; i++) {
-    if (isoToMinutes(forecast.hourlyTime[i]) > now) {
-      current = i;
-      break;
-    }
-  }
-
-  float total = 0.0f;
-  for (int i = current; i < count; i++) total += forecast.hourlyPrecipitation[i];
-
-  // One line on when that changes, which is usually the question when heading out
-  bool wetNow = forecast.hourlyPrecipitation[current] >= WET_HOUR_MM;
-  String detail = wetNow ? "Wet all day" : "Dry all day";
-  for (int i = current + 1; i < count; i++) {
-    if ((forecast.hourlyPrecipitation[i] >= WET_HOUR_MM) != wetNow) {
-      detail = String(wetNow ? "Dry from " : "Wet from ") + clockTime(forecast.hourlyTime[i - 1]);
-      break;
-    }
-  }
-
-  int width;
-  drawCaptionedValue(x, top, "PRECIP 24H", String(total, 1), "mm", detail, draw, &width);
-  return width;
-}
-
-int MeteogramScreen::drawSunColumn(int x, int top, bool draw) {
-  size_t days = min(forecast.sunrises.size(), forecast.sunsets.size());
-  if (days == 0) return 0;
-
-  // Once today's sun has set, tomorrow's times are the useful ones
-  size_t day = 0;
-  if (days > 1 && isoToMinutes(forecast.currentTime) > isoToMinutes(forecast.sunsets[0])) day = 1;
-
-  long sunrise = isoToMinutes(forecast.sunrises[day]);
-  long sunset = isoToMinutes(forecast.sunsets[day]);
-  String caption = "DAYLIGHT " + formatDuration(sunset - sunrise);
-  String rise = clockTime(forecast.sunrises[day]);
-  String set = clockTime(forecast.sunsets[day]);
-
-  const int iconWidth = 22;
-  int width = max(textWidth(caption, captionFont), iconWidth + max(textWidth(rise, detailFont), textWidth(set, detailFont)));
-  if (!draw) return width;
-
-  drawText(caption, x, top + CAPTION_BASELINE, captionFont, INK);
-  drawSunIcon(x + 6, top + VALUE_BASELINE - 6, 5, true);
-  drawText(rise, x + iconWidth, top + VALUE_BASELINE, detailFont, INK);
-  drawSunIcon(x + 6, top + DETAIL_BASELINE - 6, 5, false);
-  drawText(set, x + iconWidth, top + DETAIL_BASELINE, detailFont, INK);
-  return width;
-}
-
-int MeteogramScreen::drawIndoorColumn(int x, int top, bool draw) {
-  IndoorReading indoor = readIndoorSensor();
-  if (!indoor.valid) return 0;
-
-  int width;
-  drawCaptionedValue(x, top, "INDOOR", formatDegrees(indoor.temperature, 1), "", String(indoor.humidity, 0) + "% RH", draw,
-                     &width);
-  return width;
-}
-
-int MeteogramScreen::drawStatusColumn(int right, int top, bool draw) {
+// Returns its left edge, so the indoor readings can be placed against it
+int MeteogramScreen::drawStatusColumn(int right, int top) {
   String date = forecast.lastUpdateDate;
   date.toUpperCase();
   String updated = forecast.lastUpdateTime;
 
-  int width = max(max(textWidth(date, captionFont), textWidth(updated, valueFont)), 60);
-  if (!draw) return width;
-
   drawText(date, right - textWidth(date, captionFont), top + CAPTION_BASELINE, captionFont, INK);
   drawText(updated, right - textWidth(updated, valueFont), top + VALUE_BASELINE, valueFont, INK);
-  drawBatteryIndicator(right, top + DETAIL_BASELINE);
-  return width;
+  int batteryLeft = drawBatteryIndicator(right, top + DETAIL_BASELINE);
+  return min(min(right - textWidth(date, captionFont), right - textWidth(updated, valueFont)), batteryLeft);
 }
 
 int MeteogramScreen::drawBatteryIndicator(int right, int baseline) {
@@ -506,8 +384,7 @@ void MeteogramScreen::drawMessage(const String &message) {
 void MeteogramScreen::drawMeteogram(int x, int y, int w, int h) {
   const WeatherForecast &f = forecast;
   pointCount = std::min({f.hourlyTemperatures.size(), f.hourlyWindSpeeds.size(), f.hourlyWindGusts.size(),
-                         f.hourlyTime.size(), f.hourlyPrecipitation.size(), f.hourlyCloudLow.size(),
-                         f.hourlyCloudMid.size(), f.hourlyCloudHigh.size()});
+                         f.hourlyTime.size(), f.hourlyPrecipitation.size(), f.hourlyCloudCover.size()});
   windowStart = pointCount > 0 ? isoToMinutes(f.hourlyTime[0]) : -1;
   if (pointCount < 2 || windowStart < 0) {
     drawMessage("No weather data available.");
@@ -520,26 +397,20 @@ void MeteogramScreen::drawMeteogram(int x, int y, int w, int h) {
   placedLabels.clear();
 
   int cloudTop = y;
-  int sunStripTop = cloudTop + CLOUD_ROWS * CLOUD_ROW_HEIGHT + (CLOUD_ROWS - 1) * CLOUD_ROW_GAP;
-  int temperatureTop = sunStripTop + SUN_STRIP_HEIGHT;
-  int available = y + h - TIME_AXIS_HEIGHT - temperatureTop - PANEL_GAP;
-  int temperatureHeight = round(available * TEMPERATURE_PANEL_SHARE);
-  int windTop = temperatureTop + temperatureHeight + PANEL_GAP;
-  int windHeight = available - temperatureHeight;
-  int chartBottom = windTop + windHeight;
+  int sunStripTop = cloudTop + CLOUD_ROW_HEIGHT;
+  int chartTop = sunStripTop + SUN_STRIP_HEIGHT;
+  int chartBottom = y + h - TIME_AXIS_HEIGHT;
 
-  drawNightShading(temperatureTop, temperatureHeight);
-  drawNightShading(windTop, windHeight);
-  drawTimeAxis(temperatureTop, y + h, chartBottom);
-  drawCloudLayers(cloudTop);
-  drawTemperaturePanel(temperatureTop, temperatureHeight);
-  drawWindPanel(windTop, windHeight);
+  drawNightShading(chartTop, chartBottom - chartTop);
+  drawTimeAxis(chartTop, y + h, chartBottom);
+  drawCloudCover(cloudTop);
+  drawChart(chartTop, chartBottom - chartTop);
 
   // Now: a hairline through every row, with a marker above the cloud layers
   int nowX = timeToX(isoToMinutes(f.currentTime));
   if (nowX >= plotX && nowX <= plotX + plotW) {
     for (int py = cloudTop; py <= chartBottom; py++) {
-      if (py < sunStripTop || py >= temperatureTop) display.drawPixel(nowX, py, INK);
+      if (py < sunStripTop || py >= chartTop) display.drawPixel(nowX, py, INK);
     }
     display.fillTriangle(nowX - 5, cloudTop - 7, nowX + 5, cloudTop - 7, nowX, cloudTop - 1, INK);
   }
@@ -563,29 +434,20 @@ void MeteogramScreen::drawNightShading(int top, int height) {
   }
 }
 
-void MeteogramScreen::drawCloudLayers(int top) {
-  const std::vector<float> *layers[] = {&forecast.hourlyCloudHigh, &forecast.hourlyCloudMid, &forecast.hourlyCloudLow};
-  const char *names[] = {"High", "Mid", "Low"};
+void MeteogramScreen::drawCloudCover(int top) {
+  // Each hour owns the cell centred on its timestamp; denser dither means more of the sky covered
+  for (int i = 0; i < pointCount; i++) {
+    int left = max((int)round(indexToX(i - 0.5f)), plotX);
+    int right = min((int)round(indexToX(i + 0.5f)), plotX + plotW);
+    fillDithered(left, top, right - left, CLOUD_ROW_HEIGHT, INK, forecast.hourlyCloudCover[i] / 100.0f * CLOUD_FULL_TINT);
+  }
+  drawDottedHLine(plotX, top + CLOUD_ROW_HEIGHT, plotW, 2, INK);
 
   gfx.setFont(captionFont);
   int ascent = gfx.getFontAscent();
-
-  for (int layer = 0; layer < CLOUD_ROWS; layer++) {
-    int rowTop = top + layer * (CLOUD_ROW_HEIGHT + CLOUD_ROW_GAP);
-    const std::vector<float> &cover = *layers[layer];
-
-    // Each hour owns the cell centred on its timestamp; denser dither means more of the sky covered
-    for (int i = 0; i < pointCount; i++) {
-      int left = max((int)round(indexToX(i - 0.5f)), plotX);
-      int right = min((int)round(indexToX(i + 0.5f)), plotX + plotW);
-      fillDithered(left, rowTop, right - left, CLOUD_ROW_HEIGHT, INK, cover[i] / 100.0f * CLOUD_FULL_TINT);
-    }
-    drawDottedHLine(plotX, rowTop + CLOUD_ROW_HEIGHT, plotW, 2, INK);
-
-    String name = names[layer];
-    drawText(name, plotX - UNIT / 2 - textWidth(name, captionFont), rowTop + (CLOUD_ROW_HEIGHT + ascent) / 2,
-             captionFont, INK);
-  }
+  String name = "Cloud";
+  drawText(name, plotX - UNIT / 2 - textWidth(name, captionFont), top + (CLOUD_ROW_HEIGHT + ascent) / 2, captionFont,
+           INK);
 }
 
 void MeteogramScreen::drawSunMarkers(int centerY) {
@@ -613,7 +475,7 @@ void MeteogramScreen::drawSunMarkers(int centerY) {
   }
 }
 
-void MeteogramScreen::drawTemperaturePanel(int top, int height) {
+MeteogramScreen::Axis MeteogramScreen::temperatureAxis() {
   const std::vector<float> &temperatures = forecast.hourlyTemperatures;
   float lowest = *std::min_element(temperatures.begin(), temperatures.begin() + pointCount);
   float highest = *std::max_element(temperatures.begin(), temperatures.begin() + pointCount);
@@ -625,43 +487,79 @@ void MeteogramScreen::drawTemperaturePanel(int top, int height) {
   axis.step = niceStep(span + 2 * padding, 5);
   axis.min = floorf((lowest - padding) / axis.step) * axis.step;
   axis.max = ceilf((highest + padding) / axis.step) * axis.step;
+  return axis;
+}
 
+// Sharing gridlines with the temperature scale fixes the interval count, so the step is the smallest
+// that reaches the strongest gust
+MeteogramScreen::Axis MeteogramScreen::windAxis(int intervals) {
+  float strongest =
+      *std::max_element(forecast.hourlyWindGusts.begin(), forecast.hourlyWindGusts.begin() + pointCount);
+  strongest = max(strongest,
+                  *std::max_element(forecast.hourlyWindSpeeds.begin(), forecast.hourlyWindSpeeds.begin() + pointCount));
+  float needed = max(strongest * 1.15f, WIND_MIN_FULL_SCALE);
+
+  // Wind is a magnitude, so the scale starts at calm rather than at the day's minimum
+  Axis axis;
+  axis.min = 0.0f;
+  const float steps[] = {1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50};
+  axis.step = steps[sizeof(steps) / sizeof(steps[0]) - 1];
+  for (float step : steps) {
+    if (step * intervals >= needed) {
+      axis.step = step;
+      break;
+    }
+  }
+  axis.max = axis.step * intervals;
+  return axis;
+}
+
+void MeteogramScreen::drawTicks(const Axis &axis, int top, int height, bool rightSide, bool withDegrees,
+                                bool gridlines) {
   gfx.setFont(labelFont);
   int ascent = gfx.getFontAscent();
 
   for (float tick = axis.min; tick <= axis.max + 0.01f; tick += axis.step) {
     int y = round(valueToY(tick, axis, top, height));
-    if (tick > axis.min) drawDottedHLine(plotX, y, plotW, 3, INK);
-    String label = formatDegrees(tick, 0);
+    if (gridlines && tick > axis.min) drawDottedHLine(plotX, y, plotW, 3, INK);
+    String label = withDegrees ? formatDegrees(tick, 0) : String(tick, 0);
     int labelY = constrain(y + ascent / 2, top + ascent, top + height);
-    drawText(label, plotX - UNIT / 2 - textWidth(label, labelFont), labelY, labelFont, INK);
+    int labelX = rightSide ? plotX + plotW + UNIT / 2 : plotX - UNIT / 2 - textWidth(label, labelFont);
+    drawText(label, labelX, labelY, labelFont, INK);
   }
+}
 
-  // Freezing level, only when the range reaches it
-  if (axis.min < 0.0f && axis.max > 0.0f) {
-    int y = round(valueToY(0.0f, axis, top, height));
-    for (int px = plotX; px < plotX + plotW; px += 6) display.drawFastHLine(px, y, 3, FREEZING_COLOR);
-  }
+void MeteogramScreen::drawFreezingLevel(const Axis &axis, int top, int height) {
+  if (axis.min >= 0.0f || axis.max <= 0.0f) return;
+  int y = round(valueToY(0.0f, axis, top, height));
+  for (int px = plotX; px < plotX + plotW; px += 6) display.drawFastHLine(px, y, 3, FREEZING_COLOR);
+}
 
-  // Rain bars sit behind the curve. Each amount covers the hour before its timestamp, so the bar
-  // spans that hour rather than straddling it.
+int MeteogramScreen::rainBarHeight(int index, int height) {
   float maxPrecipitation =
       *std::max_element(forecast.hourlyPrecipitation.begin(), forecast.hourlyPrecipitation.begin() + pointCount);
-  float rainScale = rainFullScale(maxPrecipitation);
-  int rainHeight = round(height * RAIN_AREA_FRACTION);
+  float amount = forecast.hourlyPrecipitation[index];
+  int barHeight = round(min(amount / rainFullScale(maxPrecipitation), 1.0f) * height * RAIN_AREA_FRACTION);
+  return barHeight <= 0 && amount >= WET_HOUR_MM ? 1 : barHeight;
+}
+
+// Each amount covers the hour before its timestamp, so the bar spans that hour rather than straddling it
+void MeteogramScreen::drawRainBars(int top, int height) {
   for (int i = 1; i < pointCount; i++) {
-    float amount = forecast.hourlyPrecipitation[i];
-    int barHeight = round(min(amount / rainScale, 1.0f) * rainHeight);
-    if (barHeight <= 0 && amount >= WET_HOUR_MM) barHeight = 1;
+    int barHeight = rainBarHeight(i, height);
     if (barHeight <= 0) continue;
     int left = round(indexToX(i - 1)) + 2;
     int right = round(indexToX(i)) - 2;
     display.fillRect(left, top + height - barHeight, right - left + 1, barHeight, PRECIPITATION_COLOR);
   }
+}
 
-  // Extremes are labelled beside the curve, so the exact high and low need no reading off the axis.
-  // They are placed first so rain labels step aside for them.
+// Extremes are labelled beside the curve, so the exact high and low need no reading off the axis
+void MeteogramScreen::drawTemperatureExtremes(const Axis &axis, int top, int height) {
+  const std::vector<float> &temperatures = forecast.hourlyTemperatures;
   gfx.setFont(labelFont);
+  int ascent = gfx.getFontAscent();
+
   int highIndex = std::max_element(temperatures.begin(), temperatures.begin() + pointCount) - temperatures.begin();
   int lowIndex = std::min_element(temperatures.begin(), temperatures.begin() + pointCount) - temperatures.begin();
   int highY = round(valueToY(temperatures[highIndex], axis, top, height));
@@ -672,90 +570,79 @@ void MeteogramScreen::drawTemperaturePanel(int top, int height) {
     placeLabel(formatDegrees(temperatures[lowIndex], 0), indexToX(lowIndex), lowY + ascent + 6, labelFont,
                temperatures[lowIndex] < 0 ? FREEZING_COLOR : TEMPERATURE_COLOR);
   }
+}
 
-  // Rain amounts above the notable bars, largest first so they win any collision. They go down
-  // before the curve, so where the two cross the temperature stays whole.
+// Rain amounts above the notable bars, largest first so they win any collision. They go down before
+// the temperature curve, and step inside the bar where the curve would run through them.
+void MeteogramScreen::drawRainLabels(const Axis &temperature, int top, int height) {
   std::vector<int> wetHours;
   for (int i = 1; i < pointCount; i++) {
     if (forecast.hourlyPrecipitation[i] >= 0.2f) wetHours.push_back(i);
   }
   std::sort(wetHours.begin(), wetHours.end(),
             [&](int a, int b) { return forecast.hourlyPrecipitation[a] > forecast.hourlyPrecipitation[b]; });
+
   gfx.setFont(captionFont);
-  int captionAscent = gfx.getFontAscent();
+  int ascent = gfx.getFontAscent();
   auto curveCrosses = [&](int left, int right, int boxTop, int boxBottom) {
     for (int px = left; px <= right; px++) {
-      float y = valueToY(sampleSeries(temperatures, (px - plotX) / xStep), axis, top, height);
+      float y = valueToY(sampleSeries(forecast.hourlyTemperatures, (px - plotX) / xStep), temperature, top, height);
       if (y + 3 >= boxTop && y - 3 <= boxBottom) return true;
     }
     return false;
   };
 
   for (int i : wetHours) {
-    float amount = forecast.hourlyPrecipitation[i];
-    String label = String(amount, 1);
-    int barHeight = round(min(amount / rainScale, 1.0f) * rainHeight);
+    String label = String(forecast.hourlyPrecipitation[i], 1);
+    int barHeight = rainBarHeight(i, height);
     int barTop = top + height - barHeight;
     int centerX = indexToX(i - 0.5f);
     int labelWidth = textWidth(label, captionFont);
     int left = centerX - labelWidth / 2, right = centerX + labelWidth / 2;
 
-    if (!curveCrosses(left, right, barTop - 3 - captionAscent, barTop - 1)) {
+    if (!curveCrosses(left, right, barTop - 3 - ascent, barTop - 1)) {
       placeLabel(label, centerX, barTop - 3, captionFont, PRECIPITATION_COLOR);
-    } else if (barHeight >= captionAscent + 6 && labelWidth <= xStep - 4 &&
-               !curveCrosses(left, right, barTop + 1, barTop + captionAscent + 3)) {
-      // The curve runs just above this bar, so the amount moves inside it, knocked out in paper
-      drawText(label, left, barTop + captionAscent + 3, captionFont, PAPER);
+    } else if (barHeight >= ascent + 6 && labelWidth <= xStep - 4 &&
+               !curveCrosses(left, right, barTop + 1, barTop + ascent + 3)) {
+      drawText(label, left, barTop + ascent + 3, captionFont, PAPER);
     }
   }
-
-  display.drawFastHLine(plotX, top + height, plotW + 1, INK);
-
-  drawSeries(temperatures, axis, top, height, 3, TEMPERATURE_COLOR, FREEZING_COLOR, false);
-
-  // The rain unit sits level with the bars it describes; temperature ticks already carry their degree sign
-  drawText("mm", plotX + plotW + UNIT / 2, top + height, labelFont, PRECIPITATION_COLOR);
 }
 
-void MeteogramScreen::drawWindPanel(int top, int height) {
-  float strongest =
-      *std::max_element(forecast.hourlyWindGusts.begin(), forecast.hourlyWindGusts.begin() + pointCount);
-  strongest = max(strongest,
-                  *std::max_element(forecast.hourlyWindSpeeds.begin(), forecast.hourlyWindSpeeds.begin() + pointCount));
-
-  // Wind is a magnitude, so the scale starts at calm rather than at the day's minimum
-  Axis axis;
-  float needed = max(strongest * 1.15f, WIND_MIN_FULL_SCALE);
-  axis.step = niceStep(needed, 3);
-  axis.min = 0.0f;
-  axis.max = ceilf(needed / axis.step) * axis.step;
-
-  gfx.setFont(labelFont);
-  int ascent = gfx.getFontAscent();
-
-  for (float tick = axis.min; tick <= axis.max + 0.01f; tick += axis.step) {
-    int y = round(valueToY(tick, axis, top, height));
-    if (tick > axis.min) drawDottedHLine(plotX, y, plotW, 3, INK);
-    String label = String(tick, 0);
-    int labelY = constrain(y + ascent / 2, top + ascent, top + height);
-    drawText(label, plotX - UNIT / 2 - textWidth(label, labelFont), labelY, labelFont, INK);
-  }
-
-  display.drawFastHLine(plotX, top + height, plotW + 1, INK);
-
-  // The band between mean wind and gusts shows how gusty it is at a glance
-  fillBetweenSeries(forecast.hourlyWindSpeeds, forecast.hourlyWindGusts, axis, top, height, GUST_BAND_COLOR,
-                    GUST_TINT);
-  drawSeries(forecast.hourlyWindGusts, axis, top, height, 2, WIND_COLOR, WIND_COLOR, true);
+// The band between mean wind and gusts shows how gusty it is at a glance
+void MeteogramScreen::drawWind(const Axis &axis, int top, int height) {
+  fillBetweenSeries(forecast.hourlyWindSpeeds, forecast.hourlyWindGusts, axis, top, height, WIND_COLOR, GUST_TINT);
+  drawSeries(forecast.hourlyWindGusts, axis, top, height, 1, WIND_COLOR, WIND_COLOR, true);
   drawSeries(forecast.hourlyWindSpeeds, axis, top, height, 3, WIND_COLOR, WIND_COLOR, false);
+}
 
-  int gustIndex =
-      std::max_element(forecast.hourlyWindGusts.begin(), forecast.hourlyWindGusts.begin() + pointCount) -
-      forecast.hourlyWindGusts.begin();
+void MeteogramScreen::drawGustLabel(const Axis &axis, int top, int height) {
+  int gustIndex = std::max_element(forecast.hourlyWindGusts.begin(), forecast.hourlyWindGusts.begin() + pointCount) -
+                  forecast.hourlyWindGusts.begin();
   int gustY = round(valueToY(forecast.hourlyWindGusts[gustIndex], axis, top, height));
   placeLabel(String(forecast.hourlyWindGusts[gustIndex], 0), indexToX(gustIndex), gustY - 5, labelFont, WIND_COLOR);
+}
 
-  drawText("m/s", plotX + plotW + UNIT / 2, top + (height + ascent) / 2, labelFont, WIND_COLOR);
+// Temperature on the left scale and wind on the right, sharing gridlines, with rain along the bottom
+void MeteogramScreen::drawChart(int top, int height) {
+  Axis temperature = temperatureAxis();
+  int intervals = round((temperature.max - temperature.min) / temperature.step);
+  Axis wind = windAxis(intervals);
+
+  drawTicks(temperature, top, height, false, true, true);
+  drawTicks(wind, top, height, true, false, false);
+  drawFreezingLevel(temperature, top, height);
+
+  drawWind(wind, top, height);
+  drawRainBars(top, height);
+  drawTemperatureExtremes(temperature, top, height);
+  drawGustLabel(wind, top, height);
+  drawRainLabels(temperature, top, height);
+  display.drawFastHLine(plotX, top + height, plotW + 1, INK);
+  drawSeries(forecast.hourlyTemperatures, temperature, top, height, 3, TEMPERATURE_COLOR, FREEZING_COLOR, false);
+
+  // Units sit above their scales, in the row the sun markers leave free at either end
+  drawText("m/s", plotX + plotW + UNIT / 2, top - UNIT / 2, labelFont, WIND_COLOR);
 }
 
 void MeteogramScreen::drawTimeAxis(int chartTop, int baseline, int gridBottom) {

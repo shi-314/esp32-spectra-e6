@@ -46,15 +46,16 @@ built in `OpenMeteoAPI::getForecast`, for example:
 
 ```bash
 curl -s "https://api.open-meteo.com/v1/forecast?latitude=55.86&longitude=-4.25\
-&hourly=temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,cloud_cover_low,cloud_cover_mid,cloud_cover_high\
-&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m\
+&hourly=temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,cloud_cover\
+&current=temperature_2m,apparent_temperature,weather_code\
 &daily=sunrise,sunset&forecast_days=2&past_hours=1&forecast_hours=24&wind_speed_unit=ms&timezone=auto" \
   > /tmp/forecast.json
 ```
 
 The fixtures cover the cases most likely to break the layout:
 
-- `glasgow-rain.json`: a real response with light morning rain
+- `glasgow-rain.json`: a real response with light morning rain. Its total cloud cover is derived from
+  the separate cloud layers the firmware used to request.
 - `winter-storm.json`: an edited response with sub-zero temperatures, heavy precipitation, strong
   gusts, and an evening start time, so the window spans midnight and two sunsets
 

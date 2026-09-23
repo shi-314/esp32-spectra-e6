@@ -25,8 +25,6 @@ struct WeatherForecast {
 
   float currentTemperature;
   float currentApparentTemperature;
-  float currentWindSpeed;
-  float currentWindGusts;
   String currentWeatherDescription;
   int currentWeatherCode;
   String currentWeatherCodeDescription;
@@ -36,9 +34,7 @@ struct WeatherForecast {
   std::vector<float> hourlyWindGusts;
   std::vector<String> hourlyTime;  // Local ISO timestamps
   std::vector<float> hourlyPrecipitation;
-  std::vector<float> hourlyCloudLow;
-  std::vector<float> hourlyCloudMid;
-  std::vector<float> hourlyCloudHigh;
+  std::vector<float> hourlyCloudCover;
 
   String apiPayload;
 };

@@ -67,23 +67,28 @@ class MeteogramScreen : public Screen {
   bool placeLabel(const String& text, int centerX, int baseline, const uint8_t* font, uint16_t color);
 
   void drawHeader(int x, int y, int w);
-  int drawNowColumn(int x, int top, bool draw);
-  int drawWindColumn(int x, int top, bool draw);
-  int drawRainColumn(int x, int top, bool draw);
-  int drawSunColumn(int x, int top, bool draw);
-  int drawIndoorColumn(int x, int top, bool draw);
-  int drawStatusColumn(int right, int top, bool draw);
-  void drawCaptionedValue(int x, int top, const String& caption, const String& value, const String& unit,
-                          const String& detail, bool draw, int* width);
+  void drawNowColumn(int x, int top);
+  // Returns its left edge, so neighbouring content can be placed against it
+  int drawStatusColumn(int right, int top);
   int drawBatteryIndicator(int right, int baseline);
   void drawSunIcon(int centerX, int centerY, int radius, bool rising);
 
   void drawMeteogram(int x, int y, int w, int h);
   void drawNightShading(int top, int height);
-  void drawCloudLayers(int top);
+  void drawCloudCover(int top);
   void drawSunMarkers(int centerY);
-  void drawTemperaturePanel(int top, int height);
-  void drawWindPanel(int top, int height);
+  Axis temperatureAxis();
+  // Wind scale with a fixed number of intervals, so it can share the temperature gridlines
+  Axis windAxis(int intervals);
+  void drawTicks(const Axis& axis, int top, int height, bool rightSide, bool withDegrees, bool gridlines);
+  void drawFreezingLevel(const Axis& axis, int top, int height);
+  int rainBarHeight(int index, int height);
+  void drawRainBars(int top, int height);
+  void drawTemperatureExtremes(const Axis& axis, int top, int height);
+  void drawRainLabels(const Axis& temperature, int top, int height);
+  void drawWind(const Axis& axis, int top, int height);
+  void drawGustLabel(const Axis& axis, int top, int height);
+  void drawChart(int top, int height);
   void drawTimeAxis(int chartTop, int baseline, int gridBottom);
   void drawMessage(const String& message);
 

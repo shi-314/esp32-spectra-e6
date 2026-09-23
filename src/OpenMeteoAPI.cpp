@@ -9,10 +9,9 @@ WeatherForecast OpenMeteoAPI::getForecast(float latitude, float longitude) const
   // A rolling window from the previous hour to 24 hours ahead, so the chart always looks forward.
   // Daily values cover two days because that window usually spans a second sunrise.
   String url = String(forecastEndpoint) + "?latitude=" + String(latitude, 6) + "&longitude=" + String(longitude, 6) +
-               "&hourly=temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,cloud_cover_low,cloud_cover_mid," +
-               "cloud_cover_high" + "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m," +
-               "wind_gusts_10m" + "&daily=sunrise,sunset" + "&forecast_days=2" + "&past_hours=1" +
-               "&forecast_hours=24" + "&wind_speed_unit=ms" + "&timezone=auto";
+               "&hourly=temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,cloud_cover" +
+               "&current=temperature_2m,apparent_temperature,weather_code" + "&daily=sunrise,sunset" +
+               "&forecast_days=2" + "&past_hours=1" + "&forecast_hours=24" + "&wind_speed_unit=ms" + "&timezone=auto";
 
   http.begin(url);
   int httpCode = http.GET();
@@ -55,8 +54,6 @@ WeatherForecast OpenMeteoAPI::parseForecast(const String& payload) const {
   forecast.currentWeatherCode = doc["current"]["weather_code"];
   forecast.currentWeatherCodeDescription = getWeatherDescription(forecast.currentWeatherCode);
   forecast.currentWeatherDescription = forecast.currentWeatherCodeDescription;
-  forecast.currentWindSpeed = doc["current"]["wind_speed_10m"];
-  forecast.currentWindGusts = doc["current"]["wind_gusts_10m"];
 
   forecast.currentTime = doc["current"]["time"].as<String>();
   struct tm timeinfo = {};
@@ -78,9 +75,7 @@ WeatherForecast OpenMeteoAPI::parseForecast(const String& payload) const {
   appendArray(hourly["wind_speed_10m"].as<JsonArray>(), forecast.hourlyWindSpeeds);
   appendArray(hourly["wind_gusts_10m"].as<JsonArray>(), forecast.hourlyWindGusts);
   appendArray(hourly["precipitation"].as<JsonArray>(), forecast.hourlyPrecipitation);
-  appendArray(hourly["cloud_cover_low"].as<JsonArray>(), forecast.hourlyCloudLow);
-  appendArray(hourly["cloud_cover_mid"].as<JsonArray>(), forecast.hourlyCloudMid);
-  appendArray(hourly["cloud_cover_high"].as<JsonArray>(), forecast.hourlyCloudHigh);
+  appendArray(hourly["cloud_cover"].as<JsonArray>(), forecast.hourlyCloudCover);
 
   return forecast;
 }
