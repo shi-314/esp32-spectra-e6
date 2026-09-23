@@ -414,8 +414,9 @@ int MeteogramScreen::drawBatteryIndicator(int right, int baseline) {
 
 // Half sun on the horizon with rays to the sides and an arrow above, pointing up at sunrise and down
 // at sunset. The disc is yellow with an ink outline, since yellow alone vanishes against the paper.
-// The horizon sits on the text baseline.
+// Every stroke is the same two pixels wide, and the horizon sits on the text baseline.
 void MeteogramScreen::drawSunEventIcon(int x, int baseline, bool rising) {
+  const int STROKE = 2;
   const int radius = 7;
   int centerX = x + SUN_ICON_WIDTH / 2;
   int horizonY = baseline - 2;
@@ -425,32 +426,32 @@ void MeteogramScreen::drawSunEventIcon(int x, int baseline, bool rising) {
     for (int dx = -radius; dx <= radius; dx++) {
       int distance = dx * dx + dy * dy;
       if (distance <= radius * radius + radius) {
-        bool edge = distance > (radius - 1) * (radius - 1) + (radius - 1);
+        bool edge = distance > (radius - STROKE) * (radius - STROKE) + (radius - STROKE);
         display.drawPixel(centerX + dx, horizonY + dy, edge ? INK : SUN_COLOR);
       }
     }
   }
 
-  // Rays, two pixels wide so they survive at this size
+  // Rays are stamped with a square pen, so diagonals come out as thick as the straight strokes
   const float angles[] = {15.0f, 50.0f, 130.0f, 165.0f};
   for (float angle : angles) {
     float dx = cosf(angle * PI / 180.0f), dy = -sinf(angle * PI / 180.0f);
-    int x0 = centerX + round(dx * (radius + 3)), y0 = horizonY + round(dy * (radius + 3));
-    int x1 = centerX + round(dx * (radius + 6)), y1 = horizonY + round(dy * (radius + 6));
-    display.drawLine(x0, y0, x1, y1, INK);
-    display.drawLine(x0 + 1, y0, x1 + 1, y1, INK);
+    for (float distance = radius + 3; distance <= radius + 6; distance += 0.5f) {
+      display.fillRect(centerX + round(dx * distance) - STROKE / 2, horizonY + round(dy * distance) - STROKE / 2, STROKE,
+                       STROKE, INK);
+    }
   }
 
-  display.fillRect(x, horizonY + 1, SUN_ICON_WIDTH, 2, INK);
+  display.fillRect(x, horizonY + 1, SUN_ICON_WIDTH, STROKE, INK);
 
   int arrowTop = horizonY - radius - 12;
   int arrowBottom = horizonY - radius - 3;
   const int headHeight = 5;
   if (rising) {
     display.fillTriangle(centerX - 4, arrowTop + headHeight, centerX + 4, arrowTop + headHeight, centerX, arrowTop, INK);
-    display.fillRect(centerX - 1, arrowTop + headHeight, 2, arrowBottom - arrowTop - headHeight + 1, INK);
+    display.fillRect(centerX - 1, arrowTop + headHeight, STROKE, arrowBottom - arrowTop - headHeight + 1, INK);
   } else {
-    display.fillRect(centerX - 1, arrowTop, 2, arrowBottom - arrowTop - headHeight + 1, INK);
+    display.fillRect(centerX - 1, arrowTop, STROKE, arrowBottom - arrowTop - headHeight + 1, INK);
     display.fillTriangle(centerX - 4, arrowBottom - headHeight, centerX + 4, arrowBottom - headHeight, centerX, arrowBottom,
                          INK);
   }
