@@ -116,12 +116,6 @@ String upperCase(const String &text) {
 
 String clockTime(const String &iso) { return iso.length() >= 16 ? iso.substring(11, 16) : String(""); }
 
-String formatDuration(long minutes) {
-  String mm = String(minutes % 60);
-  if (mm.length() < 2) mm = "0" + mm;
-  return String(minutes / 60) + "h " + mm + "m";
-}
-
 // Temperatures round to whole degrees on the axis but keep a decimal in the header
 String formatDegrees(float value, int decimals) {
   String text = String(value, decimals);
@@ -351,8 +345,7 @@ int MeteogramScreen::drawNowColumn(int x, int top) {
   return textX + max(textWidth(forecast.currentWeatherDescription, detailFont), textWidth(feels, detailFont));
 }
 
-// Sunrise and sunset side by side with the day length beneath, centred between the outdoor
-// conditions and the indoor readings
+// Sunrise and sunset side by side, centred between the outdoor conditions and the indoor readings
 void MeteogramScreen::drawSunTimes(int left, int right, int top) {
   size_t days = min(forecast.sunrises.size(), forecast.sunsets.size());
   if (days == 0) return;
@@ -364,14 +357,12 @@ void MeteogramScreen::drawSunTimes(int left, int right, int top) {
   String rise = clockTime(forecast.sunrises[day]);
   String set = clockTime(forecast.sunsets[day]);
   String caption = day == 0 ? "SUN TODAY" : "SUN TOMORROW";
-  String daylight =
-      formatDuration(isoToMinutes(forecast.sunsets[day]) - isoToMinutes(forecast.sunrises[day])) + " daylight";
 
   const int iconGap = UNIT - 2;
   const int pairGap = 3 * UNIT;
   int riseWidth = SUN_ICON_WIDTH + iconGap + textWidth(rise, valueFont);
   int width = riseWidth + pairGap + SUN_ICON_WIDTH + iconGap + textWidth(set, valueFont);
-  width = max(width, max(textWidth(caption, captionFont), textWidth(daylight, detailFont)));
+  width = max(width, textWidth(caption, captionFont));
 
   int x = left + (right - left - width) / 2;
   int baseline = top + VALUE_BASELINE;
@@ -381,7 +372,6 @@ void MeteogramScreen::drawSunTimes(int left, int right, int top) {
   int setX = x + riseWidth + pairGap;
   drawSunEventIcon(setX, baseline, false);
   drawText(set, setX + SUN_ICON_WIDTH + iconGap, baseline, valueFont, INK);
-  drawText(daylight, x, top + DETAIL_BASELINE, detailFont, INK);
 }
 
 // Returns its left edge, so the indoor readings can be placed against it
