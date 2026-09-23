@@ -36,6 +36,7 @@ const int RIGHT_GUTTER = 32;
 const int CLOUD_ROW_HEIGHT = 12;
 const int CLOUD_GAP = 2 * UNIT;
 const int SUN_ICON_WIDTH = 30;
+const int DROPLET_WIDTH = 16;
 const int TIME_AXIS_HEIGHT = 20;
 
 // Tints, as the fraction of pixels inked by the ordered dither
@@ -314,15 +315,17 @@ void MeteogramScreen::drawHeader(int x, int y, int w) {
   if (indoor.valid) {
     String caption = "INDOOR";
     String temperature = formatDegrees(indoor.temperature, 1);
-    String humidity = String(indoor.humidity, 0) + "% RH";
-    int width = max(max(textWidth(caption, captionFont), textWidth(temperature, valueFont)), textWidth(humidity, detailFont));
+    String humidity = String(indoor.humidity, 0) + "%";
+    int humidityWidth = DROPLET_WIDTH + UNIT / 2 + textWidth(humidity, detailFont);
+    int width = max(max(textWidth(caption, captionFont), textWidth(temperature, valueFont)), humidityWidth);
     int dividerX = statusLeft - 2 * UNIT;
     int indoorX = dividerX - 2 * UNIT - width;
 
     drawDottedVLine(dividerX, y + 2, DETAIL_BASELINE, 2, INK);
     drawText(caption, indoorX, y + CAPTION_BASELINE, captionFont, INK);
     drawText(temperature, indoorX, y + VALUE_BASELINE, valueFont, INK);
-    drawText(humidity, indoorX, y + DETAIL_BASELINE, detailFont, INK);
+    drawDroplet(indoorX, y + DETAIL_BASELINE);
+    drawText(humidity, indoorX + DROPLET_WIDTH + UNIT / 2, y + DETAIL_BASELINE, detailFont, INK);
     indoorLeft = indoorX;
   }
 
@@ -356,17 +359,14 @@ void MeteogramScreen::drawSunTimes(int left, int right, int top) {
 
   String rise = clockTime(forecast.sunrises[day]);
   String set = clockTime(forecast.sunsets[day]);
-  String caption = day == 0 ? "SUN TODAY" : "SUN TOMORROW";
 
   const int iconGap = UNIT - 2;
   const int pairGap = 3 * UNIT;
   int riseWidth = SUN_ICON_WIDTH + iconGap + textWidth(rise, valueFont);
   int width = riseWidth + pairGap + SUN_ICON_WIDTH + iconGap + textWidth(set, valueFont);
-  width = max(width, textWidth(caption, captionFont));
 
   int x = left + (right - left - width) / 2;
   int baseline = top + VALUE_BASELINE;
-  drawText(caption, x, top + CAPTION_BASELINE, captionFont, INK);
   drawSunEventIcon(x, baseline, true);
   drawText(rise, x + SUN_ICON_WIDTH + iconGap, baseline, valueFont, INK);
   int setX = x + riseWidth + pairGap;
@@ -454,6 +454,16 @@ void MeteogramScreen::drawSunEventIcon(int x, int baseline, bool rising) {
     display.fillTriangle(centerX - 4, arrowBottom - headHeight, centerX + 4, arrowBottom - headHeight, centerX, arrowBottom,
                          INK);
   }
+}
+
+// Open Iconic droplet in the water ink, standing in for "RH" beside the humidity; sits on the baseline
+void MeteogramScreen::drawDroplet(int x, int baseline) {
+  const char dropletGlyph = 72;
+  gfx.setFont(u8g2_font_open_iconic_thing_2x_t);
+  gfx.setFontMode(1);
+  gfx.setForegroundColor(PRECIPITATION_COLOR);
+  gfx.setCursor(x, baseline + 1);
+  gfx.print(dropletGlyph);
 }
 
 void MeteogramScreen::drawMessage(const String &message) {

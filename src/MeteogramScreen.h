@@ -73,6 +73,7 @@ class MeteogramScreen : public Screen {
   int drawStatusColumn(int right, int top);
   int drawBatteryIndicator(int right, int baseline);
   void drawSunEventIcon(int x, int baseline, bool rising);
+  void drawDroplet(int x, int baseline);
 
   void drawMeteogram(int x, int y, int w, int h);
   void drawNightShading(int top, int height);
