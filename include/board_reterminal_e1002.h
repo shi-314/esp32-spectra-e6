@@ -28,6 +28,8 @@
 // keep the card deselected before talking to the display.
 #define SD_POWER_PIN 16
 #define SD_CS_PIN 14
+#define SD_MISO_PIN 8        // Only the card talks back, so the display bus runs without MISO otherwise
+#define SD_SPI_FREQUENCY 20000000
 
 // Buttons (active low with external pull-ups) wake the device from deep sleep
 #define WAKE_BUTTON_PIN 3        // Green refresh button (KEY0)

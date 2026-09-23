@@ -13,6 +13,7 @@
 #include "DisplayType.h"
 #include "ImageScreen.h"
 #include "MeteogramScreen.h"
+#include "MoonScreen.h"
 #include "OpenMeteoAPI.h"
 #include "WiFiConnection.h"
 #include "battery.h"
@@ -139,6 +140,16 @@ int displayCurrentScreen(bool wifiConnected) {
     return meteogramScreen.nextRefreshInSeconds();
   }
 
+  if (appConfig->currentScreenIndex == MOON_SCREEN) {
+    if (!appConfig->hasValidCoordinates()) {
+      geocodeCurrentLocation();
+    }
+
+    MoonScreen moonScreen(display, epdSpi, openMeteoAPI.getMoonPhase(appConfig->latitude, appConfig->longitude));
+    moonScreen.render();
+    return moonScreen.nextRefreshInSeconds();
+  }
+
   ImageScreen imageScreen(display, *appConfig);
   imageScreen.render();
   return imageScreen.nextRefreshInSeconds();
@@ -247,7 +258,12 @@ void setup() {
   digitalWrite(SD_POWER_PIN, HIGH);
 #endif
 
+#ifdef SD_MISO_PIN
+  // The microSD card shares the display's bus and is the only device that needs MISO
+  epdSpi.begin(EPD_SCLK, SD_MISO_PIN, EPD_MOSI, EPD_CS);
+#else
   epdSpi.begin(EPD_SCLK, EPD_MISO, EPD_MOSI, EPD_CS);
+#endif
 #ifdef EPD_SPI_FREQUENCY
   display.epd2.selectSPI(epdSpi, SPISettings(EPD_SPI_FREQUENCY, MSBFIRST, SPI_MODE0));
 #endif

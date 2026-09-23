@@ -80,6 +80,40 @@ WeatherForecast OpenMeteoAPI::parseForecast(const String& payload) const {
   return forecast;
 }
 
+float OpenMeteoAPI::getMoonPhase(float latitude, float longitude) const {
+  HTTPClient http;
+  // Open-Meteo gives one phase per day, so today's and tomorrow's are interpolated to the current time
+  String url = String(forecastEndpoint) + "?latitude=" + String(latitude, 6) + "&longitude=" + String(longitude, 6) +
+               "&daily=moon_phase" + "&current=is_day" + "&forecast_days=2" + "&timezone=auto";
+
+  http.begin(url);
+  int httpCode = http.GET();
+  if (httpCode != HTTP_CODE_OK) {
+    Serial.println("Failed to get moon phase");
+    http.end();
+    return NAN;
+  }
+
+  DynamicJsonDocument doc(2048);
+  DeserializationError error = deserializeJson(doc, http.getString());
+  http.end();
+
+  JsonArray phases = doc["daily"]["moon_phase"].as<JsonArray>();
+  String now = doc["current"]["time"].as<String>();
+  if (error || phases.size() < 2 || now.length() < 16) {
+    Serial.println("Moon phase response incomplete");
+    return NAN;
+  }
+
+  float today = phases[0].as<float>();
+  float tomorrow = phases[1].as<float>();
+  if (tomorrow < today) tomorrow += 1.0f;  // A new moon falls between the two days
+
+  float dayFraction = (now.substring(11, 13).toInt() * 60 + now.substring(14, 16).toInt()) / 1440.0f;
+  float phase = today + (tomorrow - today) * dayFraction;
+  return phase - floorf(phase);
+}
+
 String OpenMeteoAPI::getWeatherDescription(int weatherCode) const {
   // Open-Meteo reports the WMO subset listed at https://open-meteo.com/en/docs#weather_variable_documentation
   switch (weatherCode) {

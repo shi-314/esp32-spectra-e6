@@ -45,6 +45,8 @@ class OpenMeteoAPI {
 
   WeatherForecast getForecast(float latitude, float longitude) const;
   WeatherForecast parseForecast(const String& payload) const;
+  // Fraction of the lunation right now (0 new moon, 0.5 full), or NAN when the request fails
+  float getMoonPhase(float latitude, float longitude) const;
   GeocodingResult getLocationByCity(const String& cityName, const String& countryCode = "") const;
 
  private:

@@ -10,10 +10,15 @@
 #include "config_default.h"
 #endif
 
-enum ScreenType { CONFIG_SCREEN = 0, IMAGE_SCREEN = 1, METEOGRAM_SCREEN = 2, SCREEN_COUNT = 3 };
+enum ScreenType { CONFIG_SCREEN = 0, IMAGE_SCREEN = 1, METEOGRAM_SCREEN = 2, MOON_SCREEN = 3, SCREEN_COUNT = 4 };
 
 // Screens the buttons cycle through, in order. CONFIG_SCREEN is shown on demand, not cycled to.
+// The moon screen reads its images from the microSD card, so only boards with a card slot offer it.
+#ifdef SD_MISO_PIN
+static const ScreenType SELECTABLE_SCREENS[] = {IMAGE_SCREEN, METEOGRAM_SCREEN, MOON_SCREEN};
+#else
 static const ScreenType SELECTABLE_SCREENS[] = {IMAGE_SCREEN, METEOGRAM_SCREEN};
+#endif
 static const int SELECTABLE_SCREEN_COUNT = sizeof(SELECTABLE_SCREENS) / sizeof(SELECTABLE_SCREENS[0]);
 
 struct ApplicationConfig {

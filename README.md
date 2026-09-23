@@ -95,3 +95,6 @@ Configuration mode will automatically activate if WiFi connection fails or crede
 
 To work on the meteogram screen without flashing, render it on your computer with the preview tool.
 See [tools/preview/README.md](tools/preview/README.md).
+
+The moon screen (reTerminal E1002 only) needs its images on the microSD card. Prepare them with
+[tools/moon](tools/moon/README.md) and copy them over with [tools/sd-upload](tools/sd-upload/README.md).
