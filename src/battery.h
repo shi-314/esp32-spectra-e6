@@ -8,3 +8,4 @@
 #define BATTERY_MIN_VOLTAGE 3.3
 
 String getBatteryStatus();
+int getBatteryPercentage();

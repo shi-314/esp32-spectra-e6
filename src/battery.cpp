@@ -1,6 +1,6 @@
 #include "battery.h"
 
-String getBatteryStatus() {
+int getBatteryPercentage() {
 #ifdef BATTERY_ENABLE_PIN
   pinMode(BATTERY_ENABLE_PIN, OUTPUT);
   digitalWrite(BATTERY_ENABLE_PIN, HIGH);
@@ -32,5 +32,7 @@ String getBatteryStatus() {
   // Ensure percentage is between 0 and 100
   percentage = constrain(percentage, 0, 100);
 
-  return String((int)percentage) + "%";
+  return (int)percentage;
 }
+
+String getBatteryStatus() { return String(getBatteryPercentage()) + "%"; }

@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <esp_sleep.h>
 #include <esp_task_wdt.h>
 #include <time.h>
 
@@ -11,6 +12,8 @@
 #include "ConfigurationServer.h"
 #include "DisplayType.h"
 #include "ImageScreen.h"
+#include "MeteogramScreen.h"
+#include "OpenMeteoAPI.h"
 #include "WiFiConnection.h"
 #include "battery.h"
 #include "boards.h"
@@ -18,6 +21,7 @@
 
 std::unique_ptr<ApplicationConfig> appConfig;
 ApplicationConfigStorage configStorage;
+OpenMeteoAPI openMeteoAPI;
 
 // Standard constructor for GxEPD2
 DisplayType display(Epd2Type(EPD_CS, EPD_DC, EPD_RSET, EPD_BUSY));
@@ -28,16 +32,75 @@ SPIClass epdSpi(EPD_SPI_HOST);
 SPIClass& epdSpi = SPI;
 #endif
 
+enum ButtonWakeup { NO_BUTTON, REFRESH_BUTTON, NEXT_SCREEN_BUTTON, PREV_SCREEN_BUTTON };
+
 void goToSleep(uint64_t sleepTimeInSeconds);
 int displayCurrentScreen(bool wifiConnected);
-bool isButtonWakeup();
+ButtonWakeup getButtonWakeup();
+void cycleScreen(int direction);
+void geocodeCurrentLocation();
 void updateConfiguration(const Configuration& config);
 void initializeDefaultConfig();
 
-bool isButtonWakeup() {
+ButtonWakeup getButtonWakeup() {
   esp_sleep_wakeup_cause_t wakeupReason = esp_sleep_get_wakeup_cause();
-  Serial.printf("Wakeup cause: %d (EXT0=%d, TIMER=%d)\n", wakeupReason, ESP_SLEEP_WAKEUP_EXT0, ESP_SLEEP_WAKEUP_TIMER);
-  return (wakeupReason == ESP_SLEEP_WAKEUP_EXT0);
+  Serial.printf("Wakeup cause: %d (EXT1=%d, TIMER=%d)\n", wakeupReason, ESP_SLEEP_WAKEUP_EXT1, ESP_SLEEP_WAKEUP_TIMER);
+
+#ifdef WAKE_BUTTON_PIN
+  if (wakeupReason == ESP_SLEEP_WAKEUP_EXT1) {
+    uint64_t wakeupPins = esp_sleep_get_ext1_wakeup_status();
+    Serial.printf("Wakeup pins: 0x%llx\n", wakeupPins);
+
+#ifdef NEXT_SCREEN_BUTTON_PIN
+    if (wakeupPins & (1ULL << NEXT_SCREEN_BUTTON_PIN)) return NEXT_SCREEN_BUTTON;
+#endif
+#ifdef PREV_SCREEN_BUTTON_PIN
+    if (wakeupPins & (1ULL << PREV_SCREEN_BUTTON_PIN)) return PREV_SCREEN_BUTTON;
+#endif
+    if (wakeupPins & (1ULL << WAKE_BUTTON_PIN)) return REFRESH_BUTTON;
+  }
+#endif
+
+  return NO_BUTTON;
+}
+
+void cycleScreen(int direction) {
+  int currentIndex = 0;
+  for (int i = 0; i < SELECTABLE_SCREEN_COUNT; i++) {
+    if (SELECTABLE_SCREENS[i] == appConfig->currentScreenIndex) {
+      currentIndex = i;
+      break;
+    }
+  }
+
+  int nextIndex = (currentIndex + direction + SELECTABLE_SCREEN_COUNT) % SELECTABLE_SCREEN_COUNT;
+  appConfig->currentScreenIndex = SELECTABLE_SCREENS[nextIndex];
+  Serial.printf("Switched to screen %d\n", appConfig->currentScreenIndex);
+
+  configStorage.save(*appConfig);
+}
+
+void geocodeCurrentLocation() {
+  if (strlen(appConfig->city) == 0) {
+    Serial.println("No city configured, cannot resolve coordinates");
+    return;
+  }
+
+  Serial.printf("Geocoding location: %s (%s)\n", appConfig->city, appConfig->countryCode);
+
+  GeocodingResult location = openMeteoAPI.getLocationByCity(String(appConfig->city), String(appConfig->countryCode));
+  if (location.name.length() == 0) {
+    Serial.printf("Geocoding failed for %s\n", appConfig->city);
+    return;
+  }
+
+  appConfig->latitude = location.latitude;
+  appConfig->longitude = location.longitude;
+  strncpy(appConfig->city, location.name.c_str(), sizeof(appConfig->city) - 1);
+  strncpy(appConfig->countryCode, location.countryCode.c_str(), sizeof(appConfig->countryCode) - 1);
+
+  Serial.printf("Geocoded %s -> (%f, %f)\n", appConfig->city, appConfig->latitude, appConfig->longitude);
+  configStorage.save(*appConfig);
 }
 
 int displayCurrentScreen(bool wifiConnected) {
@@ -63,11 +126,22 @@ int displayCurrentScreen(bool wifiConnected) {
 
     configurationServer.stop();
     return configurationScreen.nextRefreshInSeconds();
-  } else {
-    ImageScreen imageScreen(display, *appConfig);
-    imageScreen.render();
-    return imageScreen.nextRefreshInSeconds();
   }
+
+  if (appConfig->currentScreenIndex == METEOGRAM_SCREEN) {
+    if (!appConfig->hasValidCoordinates()) {
+      geocodeCurrentLocation();
+    }
+
+    WeatherForecast forecast = openMeteoAPI.getForecast(appConfig->latitude, appConfig->longitude);
+    MeteogramScreen meteogramScreen(display, forecast, String(appConfig->city));
+    meteogramScreen.render();
+    return meteogramScreen.nextRefreshInSeconds();
+  }
+
+  ImageScreen imageScreen(display, *appConfig);
+  imageScreen.render();
+  return imageScreen.nextRefreshInSeconds();
 }
 
 void updateConfiguration(const Configuration& config) {
@@ -117,7 +191,15 @@ void goToSleep(uint64_t sleepTimeInSeconds) {
   uint64_t sleepTimeMicros = sleepTimeInSeconds * 1000000ULL;
   esp_sleep_enable_timer_wakeup(sleepTimeMicros);
 #ifdef WAKE_BUTTON_PIN
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)WAKE_BUTTON_PIN, 0);
+  uint64_t buttonMask = 1ULL << WAKE_BUTTON_PIN;
+#ifdef NEXT_SCREEN_BUTTON_PIN
+  buttonMask |= 1ULL << NEXT_SCREEN_BUTTON_PIN;
+#endif
+#ifdef PREV_SCREEN_BUTTON_PIN
+  buttonMask |= 1ULL << PREV_SCREEN_BUTTON_PIN;
+#endif
+  // On the ESP32-S3 this mode wakes on ANY selected pin going low (renamed ESP_EXT1_WAKEUP_ANY_LOW in newer IDF)
+  esp_sleep_enable_ext1_wakeup(buttonMask, ESP_EXT1_WAKEUP_ALL_LOW);
 #endif
   esp_deep_sleep_start();
 }
@@ -129,6 +211,8 @@ void initializeDefaultConfig() {
     Serial.println("Configuration loaded from persistent storage: ");
     Serial.printf("  - WiFi SSID: %s\n", appConfig->wifiSSID);
     Serial.printf("  - Image URL: %s\n", strlen(appConfig->imageUrl) > 0 ? appConfig->imageUrl : "[NOT SET]");
+    Serial.printf("  - Location: %s (%s)\n", appConfig->city, appConfig->countryCode);
+    Serial.printf("  - Screen: %d\n", appConfig->currentScreenIndex);
   } else {
     appConfig.reset(new ApplicationConfig());
     Serial.println("Using default configuration (no stored config found)");
@@ -141,9 +225,16 @@ void setup() {
 
   initializeDefaultConfig();
 
-  if (isButtonWakeup()) {
+  ButtonWakeup buttonWakeup = getButtonWakeup();
+  if (buttonWakeup == NEXT_SCREEN_BUTTON) {
+    cycleScreen(1);
+  } else if (buttonWakeup == PREV_SCREEN_BUTTON) {
+    cycleScreen(-1);
+  }
+
+  if (buttonWakeup != NO_BUTTON) {
     // Treat a button press like a restart: re-download and redraw even if the image is unchanged
-    Serial.println("Woken by button, forcing image refresh");
+    Serial.println("Woken by button, forcing refresh");
     ImageScreen::clearStoredImageETag();
   }
 

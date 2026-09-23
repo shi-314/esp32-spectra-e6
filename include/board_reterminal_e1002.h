@@ -29,8 +29,15 @@
 #define SD_POWER_PIN 16
 #define SD_CS_PIN 14
 
-// Green refresh button (KEY0, active low with external pull-up) wakes the device from deep sleep
-#define WAKE_BUTTON_PIN 3
+// Buttons (active low with external pull-ups) wake the device from deep sleep
+#define WAKE_BUTTON_PIN 3        // Green refresh button (KEY0)
+#define NEXT_SCREEN_BUTTON_PIN 4  // Middle button (KEY1)
+#define PREV_SCREEN_BUTTON_PIN 5  // Left button (KEY2)
+
+// Onboard temperature/humidity sensor (SHT40) on I2C bus 0
+#define SHT4X_I2C_SDA 19
+#define SHT4X_I2C_SCL 20
+#define SHT4X_I2C_ADDRESS 0x44
 
 // Battery monitoring: the divider is only powered while the enable pin is high
 #define BATTERY_PIN 1
