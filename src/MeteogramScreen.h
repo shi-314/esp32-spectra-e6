@@ -67,18 +67,17 @@ class MeteogramScreen : public Screen {
   bool placeLabel(const String& text, int centerX, int baseline, const uint8_t* font, uint16_t color);
 
   void drawHeader(int x, int y, int w);
-  void drawNowColumn(int x, int top);
+  int drawNowColumn(int x, int top);
+  void drawSunTimes(int left, int right, int top);
   // Returns its left edge, so neighbouring content can be placed against it
   int drawStatusColumn(int right, int top);
   int drawBatteryIndicator(int right, int baseline);
-  void drawSunIcon(int centerX, int centerY, int radius, bool rising);
+  void drawSunEventIcon(int x, int baseline, bool rising);
 
   void drawMeteogram(int x, int y, int w, int h);
   void drawNightShading(int top, int height);
   void drawCloudCover(int top);
   void drawCloudIcon(int right, int centerY);
-  // With draw false, only reserves the markers' space so chart labels avoid it
-  void drawSunMarkers(int top, bool draw);
   Axis temperatureAxis();
   // Wind scale with a fixed number of intervals, so it can share the temperature gridlines
   Axis windAxis(int intervals);

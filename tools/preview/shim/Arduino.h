@@ -19,6 +19,7 @@
 class __FlashStringHelper;
 typedef bool boolean;
 
+#define PI 3.1415926535897932384626433832795
 #define radians(deg) ((deg) * M_PI / 180.0)
 #define degrees(rad) ((rad) * 180.0 / M_PI)
 using std::max;

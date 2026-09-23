@@ -35,6 +35,7 @@ const int RIGHT_GUTTER = 32;
 
 const int CLOUD_ROW_HEIGHT = 12;
 const int CLOUD_GAP = 2 * UNIT;
+const int SUN_ICON_WIDTH = 30;
 const int TIME_AXIS_HEIGHT = 20;
 
 // Tints, as the fraction of pixels inked by the ordered dither
@@ -94,6 +95,12 @@ long isoToMinutes(const String &iso) {
 }
 
 String clockTime(const String &iso) { return iso.length() >= 16 ? iso.substring(11, 16) : String(""); }
+
+String formatDuration(long minutes) {
+  String mm = String(minutes % 60);
+  if (mm.length() < 2) mm = "0" + mm;
+  return String(minutes / 60) + "h " + mm + "m";
+}
 
 // Temperatures round to whole degrees on the axis but keep a decimal in the header
 String formatDegrees(float value, int decimals) {
@@ -284,8 +291,9 @@ void MeteogramScreen::render() {
 // Header: current conditions on the left, the day's key numbers in captioned columns, status on the right
 
 void MeteogramScreen::drawHeader(int x, int y, int w) {
-  drawNowColumn(x, y);
+  int nowRight = drawNowColumn(x, y);
   int statusLeft = drawStatusColumn(x + w, y);
+  int indoorLeft = statusLeft;
 
   // Indoor readings sit beside the status on the right, apart from the outdoor conditions on the left
   IndoorReading indoor = readIndoorSensor();
@@ -301,12 +309,15 @@ void MeteogramScreen::drawHeader(int x, int y, int w) {
     drawText(caption, indoorX, y + CAPTION_BASELINE, captionFont, INK);
     drawText(temperature, indoorX, y + VALUE_BASELINE, valueFont, INK);
     drawText(humidity, indoorX, y + DETAIL_BASELINE, detailFont, INK);
+    indoorLeft = indoorX;
   }
 
+  drawSunTimes(nowRight, indoorLeft, y);
   display.drawFastHLine(x, y + HEADER_RULE_Y, w, INK);
 }
 
-void MeteogramScreen::drawNowColumn(int x, int top) {
+// Returns its right edge, so the sun times can be centred in the space that is left
+int MeteogramScreen::drawNowColumn(int x, int top) {
   String location = locationName;
   location.toUpperCase();
   String temperature = formatDegrees(forecast.currentTemperature, 1);
@@ -318,6 +329,40 @@ void MeteogramScreen::drawNowColumn(int x, int top) {
   drawText(temperature, x, top + DETAIL_BASELINE, heroFont, INK);
   drawText(forecast.currentWeatherDescription, textX, top + VALUE_BASELINE, detailFont, INK);
   drawText(feels, textX, top + DETAIL_BASELINE, detailFont, INK);
+  return textX + max(textWidth(forecast.currentWeatherDescription, detailFont), textWidth(feels, detailFont));
+}
+
+// Sunrise and sunset side by side with the day length beneath, centred between the outdoor
+// conditions and the indoor readings
+void MeteogramScreen::drawSunTimes(int left, int right, int top) {
+  size_t days = min(forecast.sunrises.size(), forecast.sunsets.size());
+  if (days == 0) return;
+
+  // Once today's sun has set, tomorrow's times are the useful ones
+  size_t day = 0;
+  if (days > 1 && isoToMinutes(forecast.currentTime) > isoToMinutes(forecast.sunsets[0])) day = 1;
+
+  String rise = clockTime(forecast.sunrises[day]);
+  String set = clockTime(forecast.sunsets[day]);
+  String caption = day == 0 ? "SUN TODAY" : "SUN TOMORROW";
+  String daylight =
+      formatDuration(isoToMinutes(forecast.sunsets[day]) - isoToMinutes(forecast.sunrises[day])) + " daylight";
+
+  const int iconGap = UNIT - 2;
+  const int pairGap = 3 * UNIT;
+  int riseWidth = SUN_ICON_WIDTH + iconGap + textWidth(rise, valueFont);
+  int width = riseWidth + pairGap + SUN_ICON_WIDTH + iconGap + textWidth(set, valueFont);
+  width = max(width, max(textWidth(caption, captionFont), textWidth(daylight, detailFont)));
+
+  int x = left + (right - left - width) / 2;
+  int baseline = top + VALUE_BASELINE;
+  drawText(caption, x, top + CAPTION_BASELINE, captionFont, INK);
+  drawSunEventIcon(x, baseline, true);
+  drawText(rise, x + SUN_ICON_WIDTH + iconGap, baseline, valueFont, INK);
+  int setX = x + riseWidth + pairGap;
+  drawSunEventIcon(setX, baseline, false);
+  drawText(set, setX + SUN_ICON_WIDTH + iconGap, baseline, valueFont, INK);
+  drawText(daylight, x, top + DETAIL_BASELINE, detailFont, INK);
 }
 
 // Returns its left edge, so the indoor readings can be placed against it
@@ -359,17 +404,47 @@ int MeteogramScreen::drawBatteryIndicator(int right, int baseline) {
   return x;
 }
 
-// Yellow disc with an ink outline (yellow alone vanishes against the paper) and an arrow for the
-// direction the sun is moving
-void MeteogramScreen::drawSunIcon(int centerX, int centerY, int radius, bool rising) {
-  display.fillCircle(centerX, centerY, radius, SUN_COLOR);
-  display.drawCircle(centerX, centerY, radius, INK);
+// Half sun on the horizon with rays to the sides and an arrow above, pointing up at sunrise and down
+// at sunset. The disc is yellow with an ink outline, since yellow alone vanishes against the paper.
+// The horizon sits on the text baseline.
+void MeteogramScreen::drawSunEventIcon(int x, int baseline, bool rising) {
+  const int radius = 7;
+  int centerX = x + SUN_ICON_WIDTH / 2;
+  int horizonY = baseline - 2;
 
-  int arrowX = centerX + radius + 5;
+  // Upper half of the disc only, the rest is below the horizon
+  for (int dy = -radius; dy <= 0; dy++) {
+    for (int dx = -radius; dx <= radius; dx++) {
+      int distance = dx * dx + dy * dy;
+      if (distance <= radius * radius + radius) {
+        bool edge = distance > (radius - 1) * (radius - 1) + (radius - 1);
+        display.drawPixel(centerX + dx, horizonY + dy, edge ? INK : SUN_COLOR);
+      }
+    }
+  }
+
+  // Rays, two pixels wide so they survive at this size
+  const float angles[] = {15.0f, 50.0f, 130.0f, 165.0f};
+  for (float angle : angles) {
+    float dx = cosf(angle * PI / 180.0f), dy = -sinf(angle * PI / 180.0f);
+    int x0 = centerX + round(dx * (radius + 3)), y0 = horizonY + round(dy * (radius + 3));
+    int x1 = centerX + round(dx * (radius + 6)), y1 = horizonY + round(dy * (radius + 6));
+    display.drawLine(x0, y0, x1, y1, INK);
+    display.drawLine(x0 + 1, y0, x1 + 1, y1, INK);
+  }
+
+  display.fillRect(x, horizonY + 1, SUN_ICON_WIDTH, 2, INK);
+
+  int arrowTop = horizonY - radius - 12;
+  int arrowBottom = horizonY - radius - 3;
+  const int headHeight = 5;
   if (rising) {
-    display.fillTriangle(arrowX - 3, centerY + 2, arrowX + 3, centerY + 2, arrowX, centerY - 3, INK);
+    display.fillTriangle(centerX - 4, arrowTop + headHeight, centerX + 4, arrowTop + headHeight, centerX, arrowTop, INK);
+    display.fillRect(centerX - 1, arrowTop + headHeight, 2, arrowBottom - arrowTop - headHeight + 1, INK);
   } else {
-    display.fillTriangle(arrowX - 3, centerY - 2, arrowX + 3, centerY - 2, arrowX, centerY + 3, INK);
+    display.fillRect(centerX - 1, arrowTop, 2, arrowBottom - arrowTop - headHeight + 1, INK);
+    display.fillTriangle(centerX - 4, arrowBottom - headHeight, centerX + 4, arrowBottom - headHeight, centerX, arrowBottom,
+                         INK);
   }
 }
 
@@ -403,8 +478,6 @@ void MeteogramScreen::drawMeteogram(int x, int y, int w, int h) {
   drawNightShading(chartTop, chartBottom - chartTop);
   drawTimeAxis(chartTop, y + h, chartBottom);
   drawCloudCover(cloudTop);
-  // Sun markers claim their spots before the chart labels are placed, and are drawn over everything last
-  drawSunMarkers(chartTop, false);
   drawChart(chartTop, chartBottom - chartTop);
 
   // Now: a hairline through the cloud bar and chart, with a marker above the cloud bar
@@ -415,8 +488,6 @@ void MeteogramScreen::drawMeteogram(int x, int y, int w, int h) {
     }
     display.fillTriangle(nowX - 5, cloudTop - 7, nowX + 5, cloudTop - 7, nowX, cloudTop - 1, INK);
   }
-
-  drawSunMarkers(chartTop, true);
 }
 
 void MeteogramScreen::drawNightShading(int top, int height) {
@@ -467,39 +538,6 @@ void MeteogramScreen::drawCloudIcon(int right, int centerY) {
   for (int py = baseline - iconHeight; py <= baseline; py++) {
     for (int px = x; px < x + iconWidth; px++) {
       if ((px + py) % 2 != 0) display.drawPixel(px, py, PAPER);
-    }
-  }
-}
-
-// Sunrise and sunset sit at the top of the chart where the night shading starts or ends, with the
-// time on the daylight side of the boundary. The first pass only reserves their space.
-void MeteogramScreen::drawSunMarkers(int top, bool draw) {
-  gfx.setFont(labelFont);
-  int ascent = gfx.getFontAscent();
-  long windowEnd = windowStart + (pointCount - 1) * 60L;
-  const int iconWidth = 20;
-
-  for (int kind = 0; kind < 2; kind++) {
-    bool rising = kind == 0;
-    const std::vector<String> &events = rising ? forecast.sunrises : forecast.sunsets;
-    for (const String &event : events) {
-      long minutes = isoToMinutes(event);
-      if (minutes < windowStart || minutes > windowEnd) continue;
-
-      int x = timeToX(minutes);
-      String time = clockTime(event);
-      int width = iconWidth + textWidth(time, labelFont);
-      int left = constrain(rising ? x + 3 : x - 3 - width, plotX + 2, plotX + plotW - width - 2);
-      int baseline = top + 4 + ascent;
-      Box box = {left - 2, top + 1, left + width + 2, baseline + 3};
-
-      if (!draw) {
-        placedLabels.push_back(box);
-        continue;
-      }
-      display.fillRect(box.left, box.top, box.right - box.left, box.bottom - box.top, PAPER);
-      drawSunIcon(left + 5, baseline - ascent / 2, 4, rising);
-      drawText(time, left + iconWidth, baseline, labelFont, INK);
     }
   }
 }
