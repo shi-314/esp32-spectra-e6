@@ -31,7 +31,7 @@ const int DETAIL_BASELINE = 56;
 const int HEADER_RULE_Y = 68;
 
 const int LEFT_GUTTER = 40;
-const int RIGHT_GUTTER = 32;
+const int RIGHT_GUTTER = 44;  // Room for "15 m/s" on the wind scale
 
 const int CLOUD_ROW_HEIGHT = 12;
 const int CLOUD_GAP = 2 * UNIT;
@@ -601,7 +601,7 @@ MeteogramScreen::Axis MeteogramScreen::windAxis(int intervals) {
 }
 
 void MeteogramScreen::drawTicks(const Axis &axis, int top, int height, bool rightSide, bool withDegrees,
-                                bool gridlines) {
+                                bool gridlines, const char *endUnit) {
   gfx.setFont(labelFont);
   int ascent = gfx.getFontAscent();
 
@@ -609,6 +609,8 @@ void MeteogramScreen::drawTicks(const Axis &axis, int top, int height, bool righ
     int y = round(valueToY(tick, axis, top, height));
     if (gridlines && tick > axis.min) drawDottedHLine(plotX, y, plotW, 3, INK);
     String label = withDegrees ? formatDegrees(tick, 0) : String(tick, 0);
+    bool end = tick <= axis.min + 0.01f || tick >= axis.max - 0.01f;
+    if (endUnit && end) label += String(" ") + endUnit;
     int labelY = constrain(y + ascent / 2, top + ascent, top + height);
     int labelX = rightSide ? plotX + plotW + UNIT / 2 : plotX - UNIT / 2 - textWidth(label, labelFont);
     drawText(label, labelX, labelY, labelFont, INK);
@@ -716,7 +718,8 @@ void MeteogramScreen::drawChart(int top, int height) {
   Axis wind = windAxis(intervals);
 
   drawTicks(temperature, top, height, false, true, true);
-  drawTicks(wind, top, height, true, false, false);
+  // The wind unit rides on the scale's first and last values instead of a separate label
+  drawTicks(wind, top, height, true, false, false, "m/s");
   drawFreezingLevel(temperature, top, height);
 
   drawWind(wind, top, height);
@@ -726,9 +729,6 @@ void MeteogramScreen::drawChart(int top, int height) {
   drawRainLabels(temperature, top, height);
   display.drawFastHLine(plotX, top + height, plotW + 1, INK);
   drawSeries(forecast.hourlyTemperatures, temperature, top, height, 3, TEMPERATURE_COLOR, FREEZING_COLOR, false);
-
-  // The wind unit sits above its scale, level with the gap under the cloud bar
-  drawText("m/s", plotX + plotW + UNIT / 2, top - UNIT / 2, labelFont, WIND_COLOR);
 }
 
 void MeteogramScreen::drawTimeAxis(int chartTop, int baseline, int gridBottom) {

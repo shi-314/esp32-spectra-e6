@@ -82,7 +82,9 @@ class MeteogramScreen : public Screen {
   Axis temperatureAxis();
   // Wind scale with a fixed number of intervals, so it can share the temperature gridlines
   Axis windAxis(int intervals);
-  void drawTicks(const Axis& axis, int top, int height, bool rightSide, bool withDegrees, bool gridlines);
+  // endUnit, when given, is appended to the lowest and highest tick labels
+  void drawTicks(const Axis& axis, int top, int height, bool rightSide, bool withDegrees, bool gridlines,
+                 const char* endUnit = nullptr);
   void drawFreezingLevel(const Axis& axis, int top, int height);
   int rainBarHeight(int index, int height);
   void drawRainBars(int top, int height);
