@@ -18,8 +18,9 @@ Requires Python 3 with Pillow and NumPy, plus `curl`. The script:
 2. Crops the disc out of each 730×730 frame and scales it to 440px across. NASA's frames change
    size with the Moon's distance; here every frame has the same size and sits in the centre.
 3. Dithers each frame to black and white. The sunlit side uses Atkinson dithering, which keeps the
-   craters crisp. The unlit side, faintly lit by earthshine in NASA's frames, becomes a sparse random
-   scatter of dots (at most 10%), so it reads as very dark rather than pitch black.
+   craters crisp. The unlit side, faintly lit by earthshine in NASA's frames, becomes sparse, evenly
+   spaced dots (at most 10%, placed by a blue noise mask), so it reads as a smooth, very dark tone
+   rather than pitch black or grainy noise.
 
 The prepared images are committed in `tools/moon/images/`, so you only need to run the script to change
 how they look:

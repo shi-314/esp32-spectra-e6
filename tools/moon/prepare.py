@@ -39,8 +39,9 @@ WHITE = 235
 GAMMA = 0.85
 
 # The unlit side is faintly lit by earthshine (levels up to about 25 in NASA's frames). It is kept
-# very dark rather than black: at most EARTHSHINE of its pixels are lit, scattered at random, since
-# error diffusion either drops tones this faint or lines them up into streaks
+# very dark rather than black: at most EARTHSHINE of its pixels are lit, placed by a blue noise mask.
+# Error diffusion either drops tones this faint or lines them up into streaks, and random dots clump
+# into specks; blue noise keeps every dot apart, so the area reads as an even dark tone
 EARTHSHINE = 0.10
 EARTHSHINE_LEVEL = 25
 EARTHSHINE_LIMIT = BLACK + 12  # Brighter than this is the sunlit side
@@ -101,11 +102,54 @@ def atkinson(gray):
     return out
 
 
-def earthshine(gray, rng):
-    """Sparse random dots on the unlit side, denser where the earthshine is brighter."""
+def blue_noise(size=64, sigma=1.5, seed=5587):
+    """Void-and-cluster threshold mask (Ulichney): ranks from 0 to 1 whose lowest values are spread as
+    evenly as possible, so thresholding it at any density gives well separated dots. Seeded, so the
+    output is the same on every run."""
+    rng = np.random.default_rng(seed)
+    frequencies = np.fft.fftfreq(size)
+    gaussian = np.exp(-(frequencies[:, None] ** 2 + frequencies[None, :] ** 2) * (2 * np.pi * sigma) ** 2 / 2)
+
+    def energy(points):
+        return np.real(np.fft.ifft2(np.fft.fft2(points) * gaussian))
+
+    def tightest_cluster(points):
+        return np.unravel_index(np.argmax(np.where(points, energy(points), -np.inf)), points.shape)
+
+    def largest_void(points):
+        return np.unravel_index(np.argmin(np.where(points, np.inf, energy(points))), points.shape)
+
+    # Start from random points and move the tightest cluster into the largest void until they settle
+    initial = rng.random((size, size)) < 0.1
+    while True:
+        cluster = tightest_cluster(initial)
+        initial[cluster] = False
+        void = largest_void(initial)
+        initial[void] = True
+        if void == cluster:
+            break
+
+    # Rank the points by removing them from the tightest clusters, then fill the largest voids
+    rank = np.zeros((size, size), dtype=np.int32)
+    count = int(initial.sum())
+    points = initial.copy()
+    for r in range(count - 1, -1, -1):
+        cluster = tightest_cluster(points)
+        points[cluster] = False
+        rank[cluster] = r
+    points = initial.copy()
+    for r in range(count, size * size):
+        void = largest_void(points)
+        points[void] = True
+        rank[void] = r
+    return (rank + 0.5) / (size * size)
+
+
+def earthshine(gray, mask):
+    """Sparse, evenly spaced dots on the unlit side, denser where the earthshine is brighter."""
     density = EARTHSHINE * np.clip((gray.astype(np.float32) - 1) / (EARTHSHINE_LEVEL - 1), 0, 1)
     density[gray >= EARTHSHINE_LIMIT] = 0
-    return rng.random(gray.shape) < density
+    return mask < density
 
 
 def tone(gray):
@@ -118,7 +162,7 @@ def main():
     IMAGES.mkdir(exist_ok=True)
     (OUT / "preview").mkdir(parents=True, exist_ok=True)
 
-    rng = np.random.default_rng(5587)  # Seeded, so the output is the same on every run
+    mask = np.tile(blue_noise(), (SIZE // 64 + 1, SIZE // 64 + 1))[:SIZE, :SIZE]
     info = json.loads(fetch(MOONINFO, CACHE / "mooninfo_2026.json").read_text())
     sheet = Image.new("L", (10 * SIZE // 4, 6 * SIZE // 4))
 
@@ -126,7 +170,7 @@ def main():
         name = f"moon.{frame_number:04d}.jpg"
         frame = Image.open(fetch(f"{FRAMES}/{name}", CACHE / name))
         gray = np.asarray(normalize(frame, entry["diameter"]))
-        lit = atkinson(tone(gray)) | earthshine(gray, rng)
+        lit = atkinson(tone(gray)) | earthshine(gray, mask)
 
         # Nothing may be lit outside the disc, whatever the dithering spilled
         yy, xx = np.mgrid[0:SIZE, 0:SIZE]
